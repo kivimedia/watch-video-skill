@@ -1,0 +1,32 @@
+{
+  "name": "@cutsense/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "author": "Ziv Raviv",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kivimedia/watch-video-skill"
+  },
+  "bin": {
+    "cutsense": "./bin/cutsense.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@cutsense/agent": "workspace:*",
+    "@cutsense/core": "workspace:*",
+    "@cutsense/storage": "workspace:*",
+    "chalk": "^5.4.0",
+    "commander": "^13.0.0",
+    "ora": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "*",
+    "typescript": "*",
+    "vitest": "*"
+  }
+}

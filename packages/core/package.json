@@ -1,0 +1,24 @@
+{
+  "name": "@cutsense/core",
+  "version": "0.1.0",
+  "type": "module",
+  "author": "Ziv Raviv",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kivimedia/watch-video-skill"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "*",
+    "typescript": "*",
+    "vitest": "*"
+  }
+}
