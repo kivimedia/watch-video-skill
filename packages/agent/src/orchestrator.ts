@@ -9,11 +9,14 @@ import {
   CostTracker,
 } from '@cutsense/core';
 import { updateJob, getJob } from '@cutsense/storage';
-import { saveJSON, loadJSON, getArtifactPath } from '@cutsense/storage';
+import { saveJSON, loadJSON, getArtifactPath, saveManifest } from '@cutsense/storage';
 import type { IngestResult, IngestOptions } from '@cutsense/core';
 import { IngestOrchestrator } from '@cutsense/ingest';
 import { understand } from '@cutsense/understand';
-import { edit, selectEnhancements } from '@cutsense/edit';
+import { edit, selectEnhancements, validateTimeline } from '@cutsense/edit';
+import { validateVUD } from '@cutsense/understand';
+import { checkVUDGate, checkEditGate } from '@cutsense/core';
+import { TrackedProvider } from '@cutsense/providers';
 import {
   render,
   generateEnhancementSpecs,
@@ -32,16 +35,20 @@ export interface PipelineOptions {
   /** Enable hybrid rendering: Revideo inserts for premium segments */
   enableEnhancement?: boolean;
   maxEnhancedSegments?: number;
+  maxBudgetUSD?: number;
   maxRepairAttempts?: number;
   onProgress?: (stage: string, step: string, detail?: string) => void;
 }
 
 export class JobOrchestrator {
-  private costTracker = new CostTracker();
+  private costTracker: CostTracker;
+  private trackedProvider: TrackedProvider;
   private maxRepairAttempts: number;
 
   constructor(private options: PipelineOptions) {
     this.maxRepairAttempts = options.maxRepairAttempts ?? 1;
+    this.costTracker = new CostTracker(options.maxBudgetUSD);
+    this.trackedProvider = new TrackedProvider(options.provider, this.costTracker);
   }
 
   async run(jobId: string): Promise<Job> {
@@ -54,14 +61,40 @@ export class JobOrchestrator {
         job = await this.runIngest(job, progress);
       }
 
-      // Understand
+      // Understand (with repair loop)
       if (job.state === JobState.INGEST_DONE) {
         job = await this.runUnderstand(job, progress);
+
+        // VUD gate check + repair
+        if (job.state === JobState.UNDERSTAND_DONE) {
+          const vud = await loadJSON<VUD>(job.id, 'vud', 'vud.json');
+          const gateResult = checkVUDGate(vud);
+          if (!gateResult.passed) {
+            progress('repair', 'vud-gate', `VUD gate failed: ${gateResult.issues.map((i) => i.message).join('; ')}`);
+            if (this.maxRepairAttempts > 0) {
+              progress('repair', 'vud-retry', 'Attempting VUD repair (re-running understand)');
+              job = await this.runUnderstand(job, progress);
+            }
+          }
+        }
       }
 
-      // Edit
+      // Edit (with repair loop)
       if (job.state === JobState.UNDERSTAND_DONE && this.options.userInstruction) {
         job = await this.runEdit(job, progress);
+
+        // Edit gate check + repair
+        if (job.state === JobState.EDIT_DONE) {
+          const timeline = await loadJSON<CutSenseTimeline>(job.id, 'edit', 'timeline.json');
+          const validation = validateTimeline(timeline);
+          if (!validation.valid) {
+            progress('repair', 'edit-gate', `Edit gate failed: ${validation.errors.join('; ')}`);
+            if (this.maxRepairAttempts > 0) {
+              progress('repair', 'edit-retry', 'Attempting edit repair (re-running edit)');
+              job = await this.runEdit(job, progress);
+            }
+          }
+        }
       }
 
       // Enhancement (hybrid Remotion + Revideo)
@@ -74,11 +107,58 @@ export class JobOrchestrator {
         job = await this.runRender(job, progress);
       }
 
+      // Save cost report + run manifest
+      await this.saveCostReport(jobId, progress);
+      await this.saveRunManifest(jobId, job, progress);
       return job;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       progress('error', 'pipeline', errorMsg);
+      await this.saveCostReport(jobId, progress).catch(() => {});
       return job;
+    }
+  }
+
+  private async saveCostReport(
+    jobId: string,
+    progress: PipelineOptions['onProgress'] & Function,
+  ): Promise<void> {
+    const costManifest = this.costTracker.toManifest();
+    await saveJSON(jobId, 'output', 'cost-report.json', costManifest);
+    if (costManifest.total > 0) {
+      progress('costs', 'saved', `Total: $${costManifest.total.toFixed(4)} | ${this.costTracker.totalInputTokens + this.costTracker.totalOutputTokens} tokens`);
+    }
+    if (this.costTracker.isOverBudget) {
+      progress('costs', 'warning', 'Job exceeded budget limit');
+    }
+  }
+
+  private async saveRunManifest(
+    jobId: string,
+    job: Job,
+    progress: PipelineOptions['onProgress'] & Function,
+  ): Promise<void> {
+    try {
+      const manifest = {
+        job,
+        policyVersion: '2026-04-11.1',
+        source: { filename: job.sourceFileName, durationSec: 0 },
+        brief: job.config,
+        artifacts: {} as Record<string, unknown>,
+        scores: { renderValidation: job.state === JobState.RENDER_DONE ? 'pass' as const : 'pending' as const },
+        costs: this.costTracker.toManifest(),
+        runtime: { repairLoops: {}, retries: {}, humanActions: [] },
+        releaseDecision: {
+          status: job.state === JobState.RENDER_DONE ? 'released' as const : 'held' as const,
+          reason: job.state === JobState.RENDER_DONE ? 'pipeline_complete' : `stopped_at_${job.state}`,
+          overrides: [],
+        },
+        events: [],
+      };
+      await saveManifest(jobId, manifest as any);
+      progress('manifest', 'saved', `Run manifest written for ${jobId}`);
+    } catch (err) {
+      progress('manifest', 'error', `Failed to save manifest: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -123,7 +203,7 @@ export class JobOrchestrator {
     try {
       const ingestResult = await loadJSON<IngestResult>(job.id, 'transcript', 'ingest-result.json');
 
-      const vud = await understand(ingestResult, this.options.provider, {
+      const vud = await understand(ingestResult, this.trackedProvider.withStage('understand'), {
         moreAI: this.options.moreAI,
         onProgress: (step, detail) => progress('understand', step, detail),
       });
@@ -154,7 +234,7 @@ export class JobOrchestrator {
     try {
       const vud = await loadJSON<VUD>(job.id, 'vud', 'vud.json');
 
-      const timeline = await edit(vud, this.options.userInstruction!, this.options.provider, {
+      const timeline = await edit(vud, this.options.userInstruction!, this.trackedProvider.withStage('edit'), {
         targetDuration: this.options.targetDuration,
         captionStyle: this.options.captionStyle,
         onProgress: (step, detail) => progress('edit', step, detail),
@@ -201,7 +281,7 @@ export class JobOrchestrator {
           captionMode: 'none',
           transitionDefault: 'cut',
         },
-        this.options.provider,
+        this.trackedProvider.withStage('enhance'),
         { maxEnhancedSegments: this.options.maxEnhancedSegments },
       );
 

@@ -76,10 +76,10 @@ export const DEFAULT_MODELS: Record<ProviderName, Record<ModelTier, ModelConfig>
   anthropic: {
     premium: {
       provider: 'anthropic',
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-opus-4-20250514',
       tier: 'premium',
-      inputCostPer1kTokens: 0.003,
-      outputCostPer1kTokens: 0.015,
+      inputCostPer1kTokens: 0.015,
+      outputCostPer1kTokens: 0.075,
       maxContextTokens: 200000,
       supportsVision: true,
       supportsJson: true,

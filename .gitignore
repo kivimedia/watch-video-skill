@@ -23,3 +23,5 @@ Thumbs.db
 *.log
 coverage/
 .cache/
+plans/
+.venv-ready

@@ -117,7 +117,7 @@ Generate: summary, keyMoments, and any segmentUpdates for visual fields you want
     version: '1.0',
     jobId: ingestResult.jobId,
     sourceFile: '',
-    duration: ingestResult.metadata.lufs ? 0 : 0,
+    duration: segments.length > 0 ? segments[segments.length - 1]!.endTime : 0,
     language: ingestResult.transcript.language,
     isRTL: ingestResult.transcript.isRTL,
     metadata: ingestResult.metadata,
@@ -128,11 +128,6 @@ Generate: summary, keyMoments, and any segmentUpdates for visual fields you want
     summary,
     keyMoments,
   };
-
-  // Calculate actual duration from segments
-  if (segments.length > 0) {
-    vud.duration = segments[segments.length - 1]!.endTime;
-  }
 
   return vud;
 }

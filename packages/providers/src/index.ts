@@ -9,6 +9,7 @@ export { BaseProvider, readImageAsBase64, getMediaType, encodeImageToBase64 } fr
 export { AnthropicProvider } from './anthropic/provider.js';
 export { OpenAIProvider } from './openai/provider.js';
 export { GeminiProvider } from './gemini/provider.js';
+export { TrackedProvider } from './tracked-provider.js';
 
 export function createProvider(
   provider: ProviderName,

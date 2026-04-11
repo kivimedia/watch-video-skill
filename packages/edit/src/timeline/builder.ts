@@ -30,6 +30,7 @@ export function buildTimeline(
       startFrom,
       durationInFrames,
       volume: 1,
+      originalSegmentId: seg.id,
       transition: {
         type: transitionType === 'mixed' ? (clipIndex % 2 === 0 ? 'fade' : 'cut') : transitionType,
         durationInFrames: transitionType === 'fade' || transitionType === 'mixed' ? Math.round(fps * 0.5) : undefined,

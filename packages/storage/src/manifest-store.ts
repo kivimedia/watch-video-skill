@@ -4,7 +4,7 @@ import { RunManifest } from '@cutsense/core';
 import { getJobDir } from './job-store.js';
 
 function manifestPath(jobId: string): string {
-  return path.join(getJobDir(jobId), 'manifest.json');
+  return path.join(getJobDir(jobId), 'run-manifest.json');
 }
 
 export async function saveManifest(jobId: string, manifest: RunManifest): Promise<void> {
