@@ -100,6 +100,24 @@ The VUD is the core abstraction - a structured JSON timeline that an LLM can rea
 }
 ```
 
+## Running the Dashboard
+
+```bash
+cd packages/dashboard
+npx next dev --port 3847
+```
+
+Opens at `http://localhost:3847` with pages for Jobs, Costs, and Policies.
+
+**Important: local storage only.** The dashboard reads job data directly from `~/.cutsense/jobs/` on the local filesystem. It shows only jobs created on the machine it runs on. There is no database or API layer in v1.
+
+To deploy to Vercel or any cloud host, you would need to add one of:
+- A REST API that reads from a shared database (Supabase, Postgres, etc.)
+- A file sync layer (S3, GCS) that mirrors the jobs directory
+- A WebSocket bridge to a machine running the CLI
+
+This is by design for v1 - CutSense is a CLI-first tool. The dashboard is an operator companion, not a standalone SaaS.
+
 ## License
 
 Apache 2.0 - See [LICENSE](LICENSE)
