@@ -19,7 +19,12 @@
   "dependencies": {
     "@cutsense/agent": "workspace:*",
     "@cutsense/core": "workspace:*",
+    "@cutsense/edit": "workspace:*",
+    "@cutsense/ingest": "workspace:*",
+    "@cutsense/providers": "workspace:*",
+    "@cutsense/renderer": "workspace:*",
     "@cutsense/storage": "workspace:*",
+    "@cutsense/understand": "workspace:*",
     "chalk": "^5.4.0",
     "commander": "^13.0.0",
     "ora": "^8.0.0"

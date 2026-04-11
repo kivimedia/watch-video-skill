@@ -17,10 +17,12 @@ export async function render(
 ): Promise<string> {
   const bundlePath = await getBundle(options.onBundleProgress);
 
+  const props = timeline as unknown as Record<string, unknown>;
+
   const composition = await selectComposition({
     serveUrl: bundlePath,
     id: 'MainEdit',
-    inputProps: timeline as Record<string, unknown>,
+    inputProps: props,
   });
 
   await renderMedia({
@@ -28,10 +30,10 @@ export async function render(
     serveUrl: bundlePath,
     codec: options.codec ?? 'h264',
     outputLocation: outputPath,
-    inputProps: timeline as Record<string, unknown>,
+    inputProps: props,
     concurrency: options.concurrency ?? 4,
     crf: options.crf ?? 18,
-    onProgress: ({ renderedFrames, encodedFrames }) => {
+    onProgress: ({ renderedFrames }) => {
       options.onProgress?.({
         renderedFrames,
         totalFrames: composition.durationInFrames,

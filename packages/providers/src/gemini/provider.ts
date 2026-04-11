@@ -43,7 +43,7 @@ export class GeminiProvider extends BaseProvider {
 
     const chat = model.startChat({
       history,
-      systemInstruction: systemMsg ? { parts: [{ text: systemMsg.content }] } : undefined,
+      systemInstruction: systemMsg ? { role: 'user' as const, parts: [{ text: systemMsg.content }] } : undefined,
     });
 
     const lastMsg = userMessages[userMessages.length - 1];

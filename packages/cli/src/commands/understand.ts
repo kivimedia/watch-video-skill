@@ -25,7 +25,7 @@ export const understandCommand = new Command('understand')
       progress.step('Building VUD');
       const vud = await runUnderstand(ingestResult, provider, {
         moreAI: opts.moreAi,
-        onProgress: (step, detail) => progress.info(`[understand] ${step}: ${detail ?? ''}`),
+        onProgress: (step: string, detail?: string) => progress.info(`[understand] ${step}: ${detail ?? ''}`),
       });
 
       const job = await getJob(jobId);

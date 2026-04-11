@@ -1,4 +1,4 @@
-import { bundle } from '@remotion/renderer';
+import { bundle } from '@remotion/bundler';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -19,7 +19,7 @@ export async function getBundle(
 
   const bundlePath = await bundle({
     entryPoint,
-    onProgress: (progress) => {
+    onProgress: (progress: number) => {
       onProgress?.(progress);
     },
   });

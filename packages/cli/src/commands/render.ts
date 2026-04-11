@@ -26,7 +26,7 @@ export const renderCommand = new Command('render')
         onProgress: ({ percent }) => {
           if (percent % 10 === 0) progress.info(`Rendering: ${percent}%`);
         },
-        onBundleProgress: (p) => {
+        onBundleProgress: (p: number) => {
           progress.info(`Bundling: ${(p * 100).toFixed(0)}%`);
         },
       });
