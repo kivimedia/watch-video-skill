@@ -21,5 +21,8 @@
     "@types/node": "*",
     "typescript": "*",
     "vitest": "*"
+  },
+  "exports": {
+    ".": "./dist/index.js"
   }
 }

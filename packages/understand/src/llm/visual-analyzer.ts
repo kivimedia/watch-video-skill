@@ -1,9 +1,22 @@
 import type { AIProvider, VisionContent } from '@cutsense/core';
 import type { SceneInfo, FrameInfo } from '@cutsense/core';
-import { readImageAsBase64, getMediaType } from '@cutsense/providers';
 import { readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+function readImageAsBase64(filePath: string): Promise<string> {
+  return readFile(filePath).then((buf) => buf.toString('base64'));
+}
+
+function getMediaType(filePath: string): 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif' {
+  const ext = filePath.toLowerCase().split('.').pop();
+  switch (ext) {
+    case 'png': return 'image/png';
+    case 'webp': return 'image/webp';
+    case 'gif': return 'image/gif';
+    default: return 'image/jpeg';
+  }
+}
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
