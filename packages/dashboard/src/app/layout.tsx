@@ -6,17 +6,57 @@ export const metadata: Metadata = {
 };
 
 const NAV_ITEMS = [
-  { href: '/', label: 'Jobs', icon: '[]' },
-  { href: '/jobs/new', label: 'New Job', icon: '+' },
-  { href: '/costs', label: 'Costs', icon: '$' },
-  { href: '/policies', label: 'Policies', icon: '#' },
-  { href: '/settings', label: 'Settings', icon: '*' },
+  { href: '/', label: 'Jobs' },
+  { href: '/jobs/new', label: 'New Job' },
+  { href: '/costs', label: 'Costs' },
+  { href: '/policies', label: 'Policies' },
+  { href: '/settings', label: 'Settings' },
 ];
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body suppressHydrationWarning style={{ margin: 0, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif', backgroundColor: '#0f1117', color: '#e4e4e7', colorScheme: 'dark' }}>
+      <head>
+        <style>{`
+          * { box-sizing: border-box; }
+          ::selection { background: #3b82f6; color: #fff; }
+          .nav-link {
+            display: block;
+            padding: 11px 24px;
+            color: #a1a1aa;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            border-left: 3px solid transparent;
+            transition: all 0.15s ease;
+          }
+          .nav-link:hover {
+            color: #e4e4e7;
+            background-color: #1a1a2e;
+            border-left-color: #3b82f644;
+          }
+          button { transition: all 0.12s ease; }
+          button:hover:not(:disabled) { filter: brightness(1.12); }
+          button:active:not(:disabled) { transform: scale(0.98); }
+          input:focus, textarea:focus, select:focus {
+            border-color: #3b82f6 !important;
+            outline: none;
+            box-shadow: 0 0 0 2px #3b82f622;
+          }
+          select option { background: #1a1a2e; color: #e4e4e7; }
+          ::-webkit-scrollbar { width: 8px; }
+          ::-webkit-scrollbar-track { background: #0f1117; }
+          ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+          ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+        `}</style>
+      </head>
+      <body suppressHydrationWarning style={{
+        margin: 0,
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif',
+        backgroundColor: '#0f1117',
+        color: '#e4e4e7',
+        colorScheme: 'dark',
+      }}>
         <div style={{ display: 'flex', minHeight: '100vh' }}>
           <nav style={{
             width: 240,
@@ -26,53 +66,44 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
+            position: 'sticky',
+            top: 0,
+            height: '100vh',
           }}>
-            <div style={{ padding: '0 20px', marginBottom: 32 }}>
+            <div style={{ padding: '0 24px', marginBottom: 36 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{
-                  width: 32, height: 32, borderRadius: 8,
+                  width: 34, height: 34, borderRadius: 8,
                   background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 16, fontWeight: 800, color: '#fff',
                 }}>C</div>
                 <div>
                   <div style={{ fontSize: 17, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>CutSense</div>
-                  <div style={{ fontSize: 11, color: '#71717a' }}>Operations Suite</div>
+                  <div style={{ fontSize: 11, color: '#71717a', letterSpacing: 0.3 }}>Operations Suite</div>
                 </div>
               </div>
             </div>
 
             <div style={{ flex: 1 }}>
               {NAV_ITEMS.map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 20px',
-                    color: '#a1a1aa',
-                    textDecoration: 'none',
-                    fontSize: 14,
-                    fontWeight: 500,
-                    borderLeft: '3px solid transparent',
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <span style={{ width: 20, textAlign: 'center', fontSize: 14, fontFamily: 'monospace', color: '#52525b' }}>{item.icon}</span>
+                <a key={item.href} href={item.href} className="nav-link">
                   {item.label}
                 </a>
               ))}
             </div>
 
-            <div style={{ padding: '12px 20px', borderTop: '1px solid #27272a' }}>
-              <div style={{ fontSize: 11, color: '#52525b' }}>v0.1.0 - Apache 2.0</div>
-              <a href="https://github.com/kivimedia/watch-video-skill" target="_blank" style={{ fontSize: 11, color: '#3b82f6', textDecoration: 'none' }}>GitHub</a>
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #27272a' }}>
+              <div style={{ fontSize: 11, color: '#71717a', marginBottom: 4 }}>CutSense v0.1.0</div>
+              <a href="https://github.com/kivimedia/watch-video-skill" target="_blank" rel="noopener" style={{ fontSize: 12, color: '#3b82f6', textDecoration: 'none' }}>
+                GitHub
+              </a>
+              <span style={{ color: '#3f3f46', margin: '0 6px' }}>-</span>
+              <span style={{ fontSize: 12, color: '#71717a' }}>Apache 2.0</span>
             </div>
           </nav>
 
-          <main style={{ flex: 1, padding: 32, overflowY: 'auto', maxHeight: '100vh' }}>
+          <main style={{ flex: 1, padding: '32px 40px', overflowY: 'auto', maxHeight: '100vh' }}>
             {children}
           </main>
         </div>

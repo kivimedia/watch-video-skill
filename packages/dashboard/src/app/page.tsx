@@ -26,15 +26,24 @@ export default async function JobsPage() {
       </div>
 
       {jobs.length === 0 ? (
-        <div style={{ ...card, textAlign: 'center', padding: 60 }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>V</div>
-          <p style={{ fontSize: 16, color: colors.textMuted, marginBottom: 8 }}>No jobs yet</p>
-          <p style={{ fontSize: 13, color: colors.textDim }}>
-            Click <a href="/jobs/new" style={{ color: colors.blue }}>New Job</a> to process your first video, or use the CLI:
+        <div style={{ ...card, textAlign: 'center', padding: '50px 40px' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14, margin: '0 auto 16px',
+            background: 'linear-gradient(135deg, #3b82f622, #8b5cf622)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 24, fontWeight: 800, color: colors.blue,
+          }}>C</div>
+          <p style={{ fontSize: 18, color: colors.white, fontWeight: 600, marginBottom: 6 }}>Ready to process your first video</p>
+          <p style={{ fontSize: 14, color: colors.textMuted, marginBottom: 20, maxWidth: 400, margin: '0 auto 20px' }}>
+            CutSense understands your video's content - transcript, visuals, entities, energy - then edits it based on your instructions.
           </p>
-          <code style={{ display: 'inline-block', marginTop: 8, padding: '8px 16px', backgroundColor: '#1a1a2e', borderRadius: 6, fontSize: 13, color: colors.blue }}>
-            cutsense run video.mp4 --prompt "..."
-          </code>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <a href="/jobs/new" style={{ ...btnPrimary, textDecoration: 'none', display: 'inline-block' }}>Create New Job</a>
+          </div>
+          <div style={{ marginTop: 16, padding: '10px 20px', backgroundColor: '#1a1a2e', borderRadius: 8, display: 'inline-block' }}>
+            <span style={{ fontSize: 12, color: colors.textDim }}>Or from CLI: </span>
+            <code style={{ fontSize: 13, color: colors.blue }}>cutsense run video.mp4 --prompt "..."</code>
+          </div>
         </div>
       ) : (
         <div style={card}>
