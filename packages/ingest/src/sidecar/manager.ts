@@ -6,7 +6,7 @@
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
+import { spawn, execFileSync } from 'child_process';
 
 // Resolve the scripts directory relative to the compiled output.
 // Compiled output lives at dist/sidecar/manager.js, so two levels up,
@@ -66,12 +66,13 @@ export class PythonSidecarManager {
       );
     }
 
+    const pythonExe = await this.findBootstrapPython();
+
     await new Promise<void>((resolve, reject) => {
-      const child = spawn('python', [setupScript], {
+      const child = spawn(pythonExe, [setupScript], {
         cwd: this.scriptsDir,
         env: { ...process.env, PYTHONUNBUFFERED: '1' },
         stdio: ['ignore', 'pipe', 'inherit'],
-        // Hide the console window on Windows
         windowsHide: true,
       });
 
@@ -82,8 +83,8 @@ export class PythonSidecarManager {
       child.on('error', (err) => {
         reject(
           new Error(
-            `Failed to start setup_venv.py: ${err.message}. ` +
-              'Is Python 3.8+ available on PATH?',
+            `Failed to start setup_venv.py with ${pythonExe}: ${err.message}. ` +
+              'Install Python 3.10+ from https://python.org/downloads/',
           ),
         );
       });
@@ -94,12 +95,55 @@ export class PythonSidecarManager {
         } else {
           reject(
             new Error(
-              `setup_venv.py exited with code ${code}. ` +
-                'Check stderr for details.',
+              `setup_venv.py exited with code ${code}. Check stderr for details.`,
             ),
           );
         }
       });
     });
+  }
+
+  /**
+   * Find a working Python to bootstrap setup_venv.py.
+   * setup_venv.py itself picks the best Python for the venv,
+   * but we need any Python 3.10+ just to run it.
+   */
+  private async findBootstrapPython(): Promise<string> {
+    // Try candidates in order. On Windows, versioned names don't exist,
+    // but we also check common install paths.
+    const candidates = ['python3', 'python'];
+
+    if (process.platform === 'win32') {
+      // Add known Windows install paths (prefer 3.11/3.12 for ML compat)
+      for (const minor of [11, 12, 10, 13, 14]) {
+        candidates.push(`C:\\Python3${minor}\\python.exe`);
+        candidates.push(`C:\\Program Files\\Python3${minor}\\python.exe`);
+      }
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const out = execFileSync(candidate, ['-c', 'import sys; print(sys.version_info[:2])'], {
+          timeout: 5000,
+          encoding: 'utf-8',
+          windowsHide: true,
+        }).trim();
+        const match = out.match(/\((\d+),\s*(\d+)\)/);
+        if (match) {
+          const major = parseInt(match[1]!, 10);
+          const minor = parseInt(match[2]!, 10);
+          if (major >= 3 && minor >= 10) {
+            return candidate;
+          }
+        }
+      } catch {
+        // Try next candidate
+      }
+    }
+
+    throw new Error(
+      'No Python 3.10+ found. Install Python from https://python.org/downloads/\n' +
+      'Tried: ' + candidates.join(', '),
+    );
   }
 }
