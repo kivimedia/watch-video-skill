@@ -25,3 +25,5 @@ coverage/
 .cache/
 plans/
 .venv-ready
+.next/
+next-env.d.ts
