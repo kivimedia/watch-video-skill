@@ -1,0 +1,10 @@
+export { understand, type UnderstandOptions } from './orchestrator.js';
+export { buildSegments } from './fusion/segment-builder.js';
+export { extractEntities } from './fusion/entity-extractor.js';
+export { extractTopics } from './fusion/topic-modeler.js';
+export { buildEnergyCurve, assignSegmentEnergy } from './fusion/energy-curve.js';
+export { analyzeVisuals, type VisualDescription } from './llm/visual-analyzer.js';
+export { buildVUD } from './llm/vud-builder.js';
+export { enhanceVUD } from './llm/more-ai.js';
+export { validateVUD, type ValidationResult } from './validators/vud-validator.js';
+export { checkCompleteness } from './validators/completeness-checker.js';
