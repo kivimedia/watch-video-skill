@@ -6,6 +6,7 @@ export * from './types/job.js';
 export * from './types/timeline.js';
 export * from './types/providers.js';
 export * from './types/ingest.js';
+export * from './types/enhancement.js';
 
 // State machine
 export * from './state-machine/states.js';

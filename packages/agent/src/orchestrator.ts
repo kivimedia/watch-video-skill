@@ -13,8 +13,14 @@ import { saveJSON, loadJSON, getArtifactPath } from '@cutsense/storage';
 import type { IngestResult, IngestOptions } from '@cutsense/core';
 import { IngestOrchestrator } from '@cutsense/ingest';
 import { understand } from '@cutsense/understand';
-import { edit } from '@cutsense/edit';
-import { render } from '@cutsense/renderer';
+import { edit, selectEnhancements } from '@cutsense/edit';
+import {
+  render,
+  generateEnhancementSpecs,
+  renderAllEnhancedScenes,
+  applyEnhancementInserts,
+  buildEnhancementManifest,
+} from '@cutsense/renderer';
 
 export interface PipelineOptions {
   provider: AIProvider;
@@ -23,6 +29,9 @@ export interface PipelineOptions {
   userInstruction?: string;
   targetDuration?: number;
   captionStyle?: 'none' | 'standard' | 'jumbo' | 'jumbo-then-standard';
+  /** Enable hybrid rendering: Revideo inserts for premium segments */
+  enableEnhancement?: boolean;
+  maxEnhancedSegments?: number;
   maxRepairAttempts?: number;
   onProgress?: (stage: string, step: string, detail?: string) => void;
 }
@@ -53,6 +62,11 @@ export class JobOrchestrator {
       // Edit
       if (job.state === JobState.UNDERSTAND_DONE && this.options.userInstruction) {
         job = await this.runEdit(job, progress);
+      }
+
+      // Enhancement (hybrid Remotion + Revideo)
+      if (job.state === JobState.EDIT_DONE && this.options.enableEnhancement) {
+        await this.runEnhancement(job, progress);
       }
 
       // Render
@@ -157,6 +171,86 @@ export class JobOrchestrator {
       job = transitionJob(job, JobState.EDIT_FAILED, msg);
       await updateJob(job.id, { state: job.state, error: msg });
       throw err;
+    }
+  }
+
+  private async runEnhancement(
+    job: Job,
+    progress: PipelineOptions['onProgress'] & Function,
+  ): Promise<void> {
+    progress('enhance', 'starting', 'Detecting enhancement opportunities');
+
+    try {
+      const vud = await loadJSON<VUD>(job.id, 'vud', 'vud.json');
+      const timeline = await loadJSON<CutSenseTimeline>(job.id, 'edit', 'timeline.json');
+
+      // Load the EDL to run enhancement selection
+      const { planCuts } = await import('@cutsense/edit');
+      // Re-use the edit decisions from the timeline to select enhancements
+      const decisions = await selectEnhancements(
+        vud,
+        {
+          jobId: vud.jobId,
+          targetDurationSec: timeline.durationInFrames / timeline.fps,
+          actualDurationSec: timeline.durationInFrames / timeline.fps,
+          decisions: timeline.clips.map((c) => ({
+            segmentId: c.originalSegmentId ?? c.id,
+            action: 'keep' as const,
+            reason: 'kept in timeline',
+          })),
+          captionMode: 'none',
+          transitionDefault: 'cut',
+        },
+        this.options.provider,
+        { maxEnhancedSegments: this.options.maxEnhancedSegments },
+      );
+
+      const candidates = decisions.filter((d) => d.level !== 'standard');
+      if (candidates.length === 0) {
+        progress('enhance', 'skip', 'No segments need enhancement');
+        return;
+      }
+
+      progress('enhance', 'specs', `${candidates.length} segments selected for enhancement`);
+
+      // Generate specs
+      const specs = generateEnhancementSpecs(vud, decisions);
+
+      // Render enhanced scenes
+      const enhancementDir = getArtifactPath(job.id, 'output', '');
+      progress('enhance', 'rendering', `Rendering ${specs.length} enhanced scenes`);
+
+      const results = await renderAllEnhancedScenes(specs, {
+        outputDir: enhancementDir,
+        onProgress: (sceneId, percent) => {
+          progress('enhance', 'scene', `${sceneId}: ${percent}%`);
+        },
+      });
+
+      // Apply inserts to timeline
+      const enhancedTimeline = applyEnhancementInserts(timeline, specs, results);
+      await saveJSON(job.id, 'edit', 'timeline.json', enhancedTimeline);
+
+      // Save enhancement manifest
+      const manifest = buildEnhancementManifest(
+        job.id,
+        vud.segments.length,
+        specs,
+        results,
+      );
+      await saveJSON(job.id, 'edit', 'enhancement-manifest.json', manifest);
+
+      const successCount = results.filter((r) => r.success).length;
+      const fallbackCount = results.filter((r) => r.fallbackToStandard).length;
+      progress(
+        'enhance',
+        'done',
+        `Enhanced ${successCount}/${specs.length} segments (${fallbackCount} fell back to standard)`,
+      );
+    } catch (err) {
+      // Enhancement failure is not fatal - the standard timeline still works
+      const msg = err instanceof Error ? err.message : String(err);
+      progress('enhance', 'error', `Enhancement failed (non-fatal): ${msg}`);
     }
   }
 

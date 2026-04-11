@@ -16,6 +16,9 @@ export interface CutSenseTimeline {
   captions?: CaptionConfig;
   titleCards?: TitleCard[];
   audioTracks?: AudioTrack[];
+  /** 'standard' = Remotion only, 'enhanced' = hybrid with Revideo inserts */
+  editMode?: 'standard' | 'enhanced';
+  enhancedSegmentCount?: number;
 }
 
 export interface TimelineClip {
@@ -26,6 +29,10 @@ export interface TimelineClip {
   volume?: number;
   playbackRate?: number;
   transition?: ClipTransition;
+  /** Set when this clip is a Revideo-enhanced insert */
+  isEnhanced?: boolean;
+  enhancedAssetPath?: string;
+  originalSegmentId?: string;
 }
 
 export interface ClipTransition {

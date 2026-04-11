@@ -16,9 +16,11 @@ export const runCommand = new Command('run')
   .option('--duration <seconds>', 'Target output duration in seconds', parseFloat)
   .option('--captions <style>', 'Caption style: none|standard|jumbo', 'standard')
   .option('--language <lang>', 'Force language (default: auto)')
+  .option('--enhance', 'Enable hybrid rendering with Revideo scene enhancements', false)
+  .option('--max-enhanced <n>', 'Max segments to enhance', parseInt)
   .option('--output <path>', 'Output file path')
   .action(async (videoPath: string, opts) => {
-    const progress = new ProgressReporter(8);
+    const progress = new ProgressReporter(opts.enhance ? 10 : 8);
 
     try {
       progress.step('Creating job', videoPath);
@@ -43,6 +45,8 @@ export const runCommand = new Command('run')
         userInstruction: opts.prompt,
         targetDuration: opts.duration,
         captionStyle: opts.captions,
+        enableEnhancement: opts.enhance,
+        maxEnhancedSegments: opts.maxEnhanced,
         ingestOptions: { language: opts.language },
         onProgress: (stage, step, detail) => {
           progress.step(`[${stage}] ${step}`, detail);
