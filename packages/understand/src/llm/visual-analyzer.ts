@@ -4,6 +4,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Resolve to src/ not dist/ since .md files aren't copied by tsc
+const __dirname = dirname(fileURLToPath(import.meta.url));
+// dist/llm/ -> dist -> package root
+const PKG_ROOT = resolve(__dirname, '..', '..');
+const PROMPTS_DIR = resolve(PKG_ROOT, 'src', 'llm', 'prompt-templates');
+
 function readImageAsBase64(filePath: string): Promise<string> {
   return readFile(filePath).then((buf) => buf.toString('base64'));
 }
@@ -17,8 +23,6 @@ function getMediaType(filePath: string): 'image/jpeg' | 'image/png' | 'image/web
     default: return 'image/jpeg';
   }
 }
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export interface VisualDescription {
   sceneId: string;
@@ -36,7 +40,7 @@ export async function analyzeVisuals(
   provider: AIProvider,
 ): Promise<VisualDescription[]> {
   const systemPrompt = await readFile(
-    resolve(__dirname, 'prompt-templates', 'visual-scene.md'),
+    resolve(PROMPTS_DIR, 'visual-scene.md'),
     'utf-8',
   );
 

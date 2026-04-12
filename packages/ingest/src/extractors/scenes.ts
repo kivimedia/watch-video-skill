@@ -38,7 +38,7 @@ export async function detectScenes(
   const runner = new ScriptRunner();
   const threshold = options.threshold ?? 0.3;
 
-  const raw = await runner.runScript<RawSceneInfo[]>(
+  const result = await runner.runScript<{ scenes: RawSceneInfo[] }>(
     'detect_scenes.py',
     [
       '--input', videoPath.replace(/\\/g, '/'),
@@ -47,6 +47,7 @@ export async function detectScenes(
     { timeoutMs: options.timeoutMs },
   );
 
+  const raw = result.scenes ?? [];
   return raw.map((s) => ({
     id: s.id,
     startTime: s.start_time,

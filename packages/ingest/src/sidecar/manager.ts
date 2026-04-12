@@ -9,13 +9,13 @@ import { fileURLToPath } from 'url';
 import { spawn, execFileSync } from 'child_process';
 
 // Resolve the scripts directory relative to the compiled output.
-// Compiled output lives at dist/sidecar/manager.js, so two levels up,
-// then into the monorepo-level sidecar/scripts folder.
+// Compiled output lives at dist/sidecar/manager.js
+// Scripts live at src/sidecar/scripts/ (not in dist)
 function resolveScriptsDir(): string {
   const thisFile = fileURLToPath(import.meta.url);
   // dist/sidecar/manager.js -> dist/sidecar -> dist -> package root
   const pkgRoot = resolve(thisFile, '..', '..', '..');
-  return join(pkgRoot, 'sidecar', 'scripts');
+  return join(pkgRoot, 'src', 'sidecar', 'scripts');
 }
 
 export class PythonSidecarManager {

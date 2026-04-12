@@ -16,7 +16,7 @@ export interface ContactSheetOptions {
 }
 
 interface ContactSheetResult {
-  output_path: string;
+  contact_sheet_path: string;
 }
 
 /**
@@ -53,5 +53,5 @@ export async function generateContactSheet(
     { timeoutMs: options.timeoutMs },
   );
 
-  return result.output_path;
+  return result.contact_sheet_path;
 }

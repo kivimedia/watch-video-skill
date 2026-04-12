@@ -39,16 +39,17 @@ export async function extractFrames(
   const runner = new ScriptRunner();
   const fps = options.fps ?? 1;
 
-  const raw = await runner.runScript<RawFrameInfo[]>(
+  const result = await runner.runScript<{ frames: RawFrameInfo[]; total_extracted: number; kept: number }>(
     'extract_frames.py',
     [
       '--input', videoPath.replace(/\\/g, '/'),
-      '--output', outputDir.replace(/\\/g, '/'),
+      '--output-dir', outputDir.replace(/\\/g, '/'),
       '--fps', String(fps),
     ],
     { timeoutMs: options.timeoutMs },
   );
 
+  const raw = result.frames ?? [];
   return raw.map((f) => ({
     path: f.path,
     timestamp: f.timestamp,

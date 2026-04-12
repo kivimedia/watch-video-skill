@@ -52,7 +52,7 @@ export async function transcribe(
 ): Promise<TranscriptResult> {
   const runner = new ScriptRunner();
 
-  const args = ['--input', audioPath.replace(/\\/g, '/')];
+  const args = ['--audio', audioPath.replace(/\\/g, '/')];
   if (options.language) {
     args.push('--language', options.language);
   }

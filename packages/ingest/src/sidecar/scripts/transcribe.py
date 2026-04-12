@@ -51,10 +51,25 @@ def main() -> None:
 
     language = None if args.language == "auto" else args.language
 
+    # Always use CPU on Windows unless CUDA is confirmed working.
+    # device="auto" can load the model but then crash during inference
+    # with missing cublas64_12.dll if CUDA runtime isn't fully installed.
+    import platform
+    use_cpu = platform.system() == "Windows"
+    if not use_cpu:
+        try:
+            import torch
+            use_cpu = not torch.cuda.is_available()
+        except ImportError:
+            use_cpu = True
+
     try:
-        model = WhisperModel(args.model, device="auto", compute_type="auto")
-    except Exception as exc:
-        # Fallback to CPU if auto fails (e.g. no CUDA)
+        if use_cpu:
+            model = WhisperModel(args.model, device="cpu", compute_type="int8")
+        else:
+            model = WhisperModel(args.model, device="cuda", compute_type="float16")
+    except Exception:
+        # Final fallback
         try:
             model = WhisperModel(args.model, device="cpu", compute_type="int8")
         except Exception as exc2:

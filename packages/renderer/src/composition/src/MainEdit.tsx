@@ -1,9 +1,9 @@
 import React from 'react';
 import { AbsoluteFill } from 'remotion';
 import type { CutSenseTimeline } from '@cutsense/core';
-import { ClipSequence } from './ClipSequence.js';
-import { CaptionStandard } from './CaptionStandard.js';
-import { CaptionJumbo } from './CaptionJumbo.js';
+import { ClipSequence } from './ClipSequence';
+import { CaptionStandard } from './CaptionStandard';
+import { CaptionJumbo } from './CaptionJumbo';
 
 export const MainEdit: React.FC<CutSenseTimeline> = (props) => {
   const { clips, captions, titleCards } = props;

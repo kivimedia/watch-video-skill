@@ -6,6 +6,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// dist/llm/ -> dist -> package root
+const PKG_ROOT = resolve(__dirname, '..', '..');
+const PROMPTS_DIR = resolve(PKG_ROOT, 'src', 'llm', 'prompt-templates');
 
 export async function buildVUD(
   ingestResult: IngestResult,
@@ -17,7 +20,7 @@ export async function buildVUD(
   provider: AIProvider,
 ): Promise<VUD> {
   const systemPrompt = await readFile(
-    resolve(__dirname, 'prompt-templates', 'vud-system.md'),
+    resolve(PROMPTS_DIR, 'vud-system.md'),
     'utf-8',
   );
 

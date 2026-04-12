@@ -1,6 +1,6 @@
 import React from 'react';
 import { Composition } from 'remotion';
-import { MainEdit } from './MainEdit.js';
+import { MainEdit } from './MainEdit';
 
 export const RemotionRoot: React.FC = () => {
   return (
