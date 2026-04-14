@@ -4,6 +4,7 @@ import { buildSegments } from './fusion/segment-builder.js';
 import { extractEntities } from './fusion/entity-extractor.js';
 import { extractTopics } from './fusion/topic-modeler.js';
 import { buildEnergyCurve, assignSegmentEnergy } from './fusion/energy-curve.js';
+import { applyAdaptiveSampling } from './fusion/adaptive-sampling.js';
 import { analyzeVisuals } from './llm/visual-analyzer.js';
 import { buildVUD } from './llm/vud-builder.js';
 import { enhanceVUD } from './llm/more-ai.js';
@@ -38,6 +39,15 @@ export async function understand(
   progress('energy', 'Calculating energy curve');
   const energyCurve = buildEnergyCurve(segments, ingestResult.metadata.lufs);
   assignSegmentEnergy(segments, energyCurve);
+
+  // 2.5. Adaptive frame sampling - refine which frames are available for visual analysis
+  progress('adaptive-sampling', 'Refining frame selection based on speech and visual changes');
+  const samplingStats = applyAdaptiveSampling(ingestResult.frames, ingestResult.transcript);
+  progress('adaptive-sampling-done',
+    `Phase 1: +${samplingStats.phase1Unflagged} frames (speech density), ` +
+    `Phase 2: +${samplingStats.phase2Unflagged} frames (visual change), ` +
+    `Total kept: ${samplingStats.totalKept}`,
+  );
 
   // 3. Run in parallel: visual analysis, entity extraction, topic modeling
   progress('analysis', 'Running visual analysis, entity extraction, and topic modeling');
