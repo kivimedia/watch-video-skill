@@ -73,6 +73,12 @@ def main() -> None:
         default=10,
         help="Max Hamming distance to consider a frame a duplicate (default: 10).",
     )
+    parser.add_argument(
+        "--min-interval",
+        type=float,
+        default=30.0,
+        help="Force keep at least one frame every N seconds even if duplicate (default: 30).",
+    )
     args = parser.parse_args()
 
     video_path = Path(args.input)
@@ -120,6 +126,7 @@ def main() -> None:
     frames_output = []
     prev_hash = None
     kept_count = 0
+    last_kept_timestamp = -999.0  # Force first frame to be kept
 
     for idx, frame_file in enumerate(frame_files):
         # Derive frame number and timestamp from the filename (1-indexed by FFmpeg)
@@ -140,9 +147,16 @@ def main() -> None:
             if hamming <= args.dedup_threshold:
                 is_duplicate = True
 
+        # Minimum density: force keep at least one frame every min_interval seconds
+        # even if it looks like a duplicate (e.g. someone sitting still at a keyboard)
+        time_since_last_kept = timestamp - last_kept_timestamp
+        if is_duplicate and time_since_last_kept >= args.min_interval:
+            is_duplicate = False
+
         if not is_duplicate:
             prev_hash = current_hash
             kept_count += 1
+            last_kept_timestamp = timestamp
 
         frames_output.append(
             {

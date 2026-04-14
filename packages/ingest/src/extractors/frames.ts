@@ -9,6 +9,8 @@ import { ScriptRunner } from '../sidecar/runner.js';
 export interface FrameExtractionOptions {
   /** Frames per second to extract. Defaults to 1. */
   fps?: number;
+  /** Min seconds between kept frames even if visually similar. Defaults to 30. */
+  minInterval?: number;
   /** Timeout in ms. Defaults to ScriptRunner default (10 min). */
   timeoutMs?: number;
 }
@@ -45,6 +47,7 @@ export async function extractFrames(
       '--input', videoPath.replace(/\\/g, '/'),
       '--output-dir', outputDir.replace(/\\/g, '/'),
       '--fps', String(fps),
+      '--min-interval', String(options.minInterval ?? 30),
     ],
     { timeoutMs: options.timeoutMs },
   );
