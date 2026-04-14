@@ -121,11 +121,14 @@ export default makeProject({
 }
 
 /**
- * Check if Revideo rendering is available.
+ * Check if Revideo rendering is available (all required deps installed).
  */
 export function isRevideoAvailable(): boolean {
   try {
     require.resolve('@revideo/renderer');
+    require.resolve('@revideo/vite-plugin');
+    require.resolve('@revideo/core');
+    require.resolve('@revideo/2d');
     return true;
   } catch {
     return false;
