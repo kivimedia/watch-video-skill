@@ -1,8 +1,11 @@
 import type { AIProvider, VisionContent } from '@cutsense/core';
 import type { SceneInfo, FrameInfo } from '@cutsense/core';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// Anthropic's 5 MB limit is on the base64-decoded bytes (i.e. the raw file size)
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 // Resolve to src/ not dist/ since .md files aren't copied by tsc
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -38,13 +41,18 @@ export async function analyzeVisuals(
   frames: FrameInfo[],
   contactSheets: string[],
   provider: AIProvider,
+  usePerSceneAnalysis?: boolean,
 ): Promise<VisualDescription[]> {
   const systemPrompt = await readFile(
     resolve(PROMPTS_DIR, 'visual-scene.md'),
     'utf-8',
   );
 
-  if (contactSheets.length > 0) {
+  // Per-scene analysis produces accurate per-segment descriptions (important for
+  // person-filtering edits). Contact sheets are cheaper but produce sparse/inaccurate
+  // descriptions because the vision model can't map thumbnails to scene boundaries.
+  // Default to per-scene analysis for now until contact sheet mapping is improved.
+  if (!usePerSceneAnalysis && contactSheets.length > 0) {
     return analyzeContactSheets(contactSheets, scenes, systemPrompt, provider);
   }
 
@@ -60,6 +68,15 @@ async function analyzeContactSheets(
   const descriptions: VisualDescription[] = [];
 
   for (const sheetPath of sheets) {
+    const fileSize = (await stat(sheetPath)).size;
+    if (fileSize > MAX_IMAGE_BYTES) {
+      throw new Error(
+        `Contact sheet too large: ${(fileSize / 1024 / 1024).toFixed(1)} MB ` +
+        `(limit ${(MAX_IMAGE_BYTES / 1024 / 1024).toFixed(1)} MB). ` +
+        `Re-run ingest with smaller thumbWidth or maxFrames.`,
+      );
+    }
+
     const imageData = await readImageAsBase64(sheetPath);
     const mediaType = getMediaType(sheetPath);
 
@@ -108,31 +125,50 @@ async function analyzeIndividualFrames(
   provider: AIProvider,
 ): Promise<VisualDescription[]> {
   const descriptions: VisualDescription[] = [];
-  const maxFramesPerScene = 3;
 
-  for (const scene of scenes) {
-    const sceneFrames = frames
-      .filter((f) => !f.isDuplicate && f.timestamp >= scene.startTime && f.timestamp <= scene.endTime)
-      .slice(0, maxFramesPerScene);
+  // Batch scenes: pick 1 representative frame per scene, send up to 10 scenes per API call.
+  // This keeps costs manageable while providing per-scene descriptions.
+  const BATCH_SIZE = 10;
 
-    if (sceneFrames.length === 0) {
-      descriptions.push({
-        sceneId: scene.id,
-        description: 'No frames available for analysis',
-        sceneType: 'other',
-        visualInterest: 2,
-      });
-      continue;
+  for (let batchStart = 0; batchStart < scenes.length; batchStart += BATCH_SIZE) {
+    const batch = scenes.slice(batchStart, batchStart + BATCH_SIZE);
+
+    const content: VisionContent[] = [];
+    const sceneList = batch.map((s) => `${s.id}: ${s.startTime.toFixed(1)}s - ${s.endTime.toFixed(1)}s`).join('\n');
+    content.push({
+      type: 'text',
+      text: `Analyze these ${batch.length} scenes. For EACH scene, describe who is visible (appearance, clothing, hair, activity), what they are doing, and the setting. Return a JSON array with one object per scene.\n\nScenes:\n${sceneList}`,
+    });
+
+    let hasFrames = false;
+    for (const scene of batch) {
+      // Pick 1 representative frame per scene (middle of scene)
+      const sceneFrames = frames
+        .filter((f) => !f.isDuplicate && f.timestamp >= scene.startTime && f.timestamp <= scene.endTime);
+
+      const midFrame = sceneFrames[Math.floor(sceneFrames.length / 2)] ?? sceneFrames[0];
+      if (midFrame) {
+        const imageData = await readImageAsBase64(midFrame.path);
+        const mediaType = getMediaType(midFrame.path);
+        content.push({
+          type: 'text',
+          text: `Frame for ${scene.id} (${midFrame.timestamp.toFixed(1)}s):`,
+        });
+        content.push({ type: 'image', source: { type: 'base64', mediaType, data: imageData } });
+        hasFrames = true;
+      }
     }
 
-    const content: VisionContent[] = [
-      { type: 'text', text: `Analyze this scene (${scene.id}): ${scene.startTime.toFixed(1)}s - ${scene.endTime.toFixed(1)}s` },
-    ];
-
-    for (const frame of sceneFrames) {
-      const imageData = await readImageAsBase64(frame.path);
-      const mediaType = getMediaType(frame.path);
-      content.push({ type: 'image', source: { type: 'base64', mediaType, data: imageData } });
+    if (!hasFrames) {
+      for (const scene of batch) {
+        descriptions.push({
+          sceneId: scene.id,
+          description: 'No frames available for analysis',
+          sceneType: 'other',
+          visualInterest: 2,
+        });
+      }
+      continue;
     }
 
     const response = await provider.chatWithVision(
@@ -140,15 +176,21 @@ async function analyzeIndividualFrames(
         { role: 'system', content: systemPrompt },
         { role: 'user', content },
       ],
-      { maxTokens: 1024 },
+      { maxTokens: 2048 },
     );
 
     try {
-      const parsed = JSON.parse(response.content);
+      let jsonStr = response.content.trim();
+      const arrStart = jsonStr.indexOf('[');
+      const arrEnd = jsonStr.lastIndexOf(']');
+      if (arrStart >= 0 && arrEnd > arrStart) {
+        jsonStr = jsonStr.slice(arrStart, arrEnd + 1);
+      }
+      const parsed = JSON.parse(jsonStr);
       const items = Array.isArray(parsed) ? parsed : [parsed];
       for (const item of items) {
         descriptions.push({
-          sceneId: item.sceneId ?? scene.id,
+          sceneId: item.sceneId ?? '',
           description: item.description ?? '',
           sceneType: item.sceneType ?? 'other',
           visualInterest: item.visualInterest ?? 3,
@@ -157,12 +199,15 @@ async function analyzeIndividualFrames(
         });
       }
     } catch {
-      descriptions.push({
-        sceneId: scene.id,
-        description: 'Analysis failed',
-        sceneType: 'other',
-        visualInterest: 2,
-      });
+      // Fallback: mark all scenes in batch as failed
+      for (const scene of batch) {
+        descriptions.push({
+          sceneId: scene.id,
+          description: 'Analysis failed',
+          sceneType: 'other',
+          visualInterest: 2,
+        });
+      }
     }
   }
 

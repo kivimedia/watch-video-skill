@@ -60,6 +60,24 @@ def main() -> None:
         default=320,
         help="Width in pixels of each thumbnail (default: 320).",
     )
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=0,
+        help="Max frames to include (0 = all). Evenly samples when capped.",
+    )
+    parser.add_argument(
+        "--max-dimension",
+        type=int,
+        default=7500,
+        help="Max pixel dimension for any side (default: 7500, API limit is 8000).",
+    )
+    parser.add_argument(
+        "--max-size-kb",
+        type=int,
+        default=3800,
+        help="Max output file size in KB (default: 3800). Base64 adds ~33%% so 3800KB file = ~5.0MB base64, under API 5MB limit.",
+    )
     args = parser.parse_args()
 
     frames_dir = Path(args.frames_dir)
@@ -71,6 +89,23 @@ def main() -> None:
     frame_files = sorted(frames_dir.glob("*.jpg"))
     if not frame_files:
         _fail(f"No .jpg files found in {frames_dir}")
+
+    # Apply max-frames cap with even sampling
+    if args.max_frames > 0 and len(frame_files) > args.max_frames:
+        step = len(frame_files) / args.max_frames
+        frame_files = [frame_files[int(i * step)] for i in range(args.max_frames)]
+        _emit_progress(f"Sampled down to {len(frame_files)} frames (max-frames={args.max_frames})")
+
+    # Auto-cap frames to stay within max pixel dimension
+    # Estimate: each row is ~(thumb_h + padding) pixels tall
+    # Max rows = max_dimension / estimated_row_height
+    estimated_row_h = int(args.thumb_width * 9 / 16) + 4 * 2 + 22  # assume 16:9 + padding + label
+    max_rows = args.max_dimension // estimated_row_h
+    max_frames_for_dim = max_rows * args.cols
+    if len(frame_files) > max_frames_for_dim:
+        step = len(frame_files) / max_frames_for_dim
+        frame_files = [frame_files[int(i * step)] for i in range(max_frames_for_dim)]
+        _emit_progress(f"Sampled down to {len(frame_files)} frames to stay within {args.max_dimension}px height limit")
 
     total_frames = len(frame_files)
     _emit_progress(f"Found {total_frames} frame(s). Building contact sheet ...")
@@ -137,8 +172,36 @@ def main() -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     _emit_progress(f"Saving contact sheet to {output_path} ...")
 
+    max_size_bytes = args.max_size_kb * 1024
+
     try:
+        # Save at default quality first
         sheet.save(str(output_path), quality=85)
+
+        # If too large, progressively reduce quality then resize
+        file_size = output_path.stat().st_size
+        if file_size > max_size_bytes:
+            for q in (70, 55, 40):
+                sheet.save(str(output_path), quality=q)
+                file_size = output_path.stat().st_size
+                _emit_progress(f"Re-saved at quality={q}, size={file_size // 1024}KB")
+                if file_size <= max_size_bytes:
+                    break
+
+        # If still too large after quality reduction, scale the whole sheet down
+        current = sheet
+        for attempt in range(3):
+            file_size = output_path.stat().st_size
+            if file_size <= max_size_bytes:
+                break
+            scale = (max_size_bytes / file_size) ** 0.55  # slightly aggressive to converge fast
+            new_w = int(current.width * scale)
+            new_h = int(current.height * scale)
+            _emit_progress(f"Resizing sheet from {current.width}x{current.height} to {new_w}x{new_h}")
+            current = current.resize((new_w, new_h), Image.LANCZOS)
+            current.save(str(output_path), quality=40)
+            file_size = output_path.stat().st_size
+            _emit_progress(f"Resize attempt {attempt + 1}: {file_size // 1024}KB")
     except Exception as exc:
         _fail(f"Failed to save contact sheet: {exc}")
 

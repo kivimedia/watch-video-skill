@@ -82,10 +82,15 @@ export class ScriptRunner {
         clearTimeout(timer);
 
         if (code !== 0) {
+          let scriptError = '';
+          try {
+            const parsed = JSON.parse(stdout.trim());
+            if (parsed?.error) scriptError = `\nScript error: ${parsed.error}`;
+          } catch { /* stdout not JSON, ignore */ }
           const stderrSummary = stderrChunks.join('').slice(-2000);
           reject(
             new Error(
-              `Script "${scriptName}" exited with code ${code}.\n` +
+              `Script "${scriptName}" exited with code ${code}.${scriptError}\n` +
                 `stderr (last 2000 chars):\n${stderrSummary}`,
             ),
           );

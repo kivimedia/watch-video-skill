@@ -3,6 +3,7 @@ export {
   getJob,
   updateJob,
   listJobs,
+  deleteJob,
   getJobDir,
 } from './job-store.js';
 

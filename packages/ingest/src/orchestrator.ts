@@ -87,26 +87,27 @@ export class IngestOrchestrator {
     // ---------------------------------------------------------------
     progress('phase-b:start', 'LUFS, transcript');
 
-    const [lufs, transcript] = await Promise.all([
-      (async () => {
-        progress('lufs:start');
-        const l = await measureLUFS(audioPath);
-        progress('lufs:done');
-        return l;
-      })(),
+    // Run sequentially to avoid Python/FFmpeg process contention on Windows.
+    let transcript;
+    if (!options.noTranscript) {
+      progress('transcript:start');
+      try {
+        transcript = await transcribe(audioPath, {
+          language: options.language,
+          timeoutMs: options.scriptTimeoutMs,
+        });
+        progress('transcript:done', `${transcript.words.length} words`);
+      } catch (err) {
+        // Transcription can crash intermittently on Windows (CTranslate2 segfault).
+        // Continue without transcript - visual analysis can still work.
+        progress('transcript:failed', err instanceof Error ? err.message : String(err));
+        console.error(`[ingest] Transcription failed, continuing without transcript: ${err}`);
+      }
+    }
 
-      options.noTranscript
-        ? Promise.resolve(undefined)
-        : (async () => {
-            progress('transcript:start');
-            const t = await transcribe(audioPath, {
-              language: options.language,
-              timeoutMs: options.scriptTimeoutMs,
-            });
-            progress('transcript:done', `${t.words.length} words`);
-            return t;
-          })(),
-    ]);
+    progress('lufs:start');
+    const lufs = await measureLUFS(audioPath);
+    progress('lufs:done');
 
     // ---------------------------------------------------------------
     // Phase C: scenes + contact sheet (depend on frames)
@@ -115,27 +116,33 @@ export class IngestOrchestrator {
 
     const contactSheetPath = join(contactSheetsDir, 'sheet.jpg');
 
-    const [scenes, contactSheetResult] = await Promise.all([
-      (async () => {
-        progress('scenes:start');
-        const s = await detectScenes(sourcePath, {
-          threshold: options.sceneThreshold,
-          timeoutMs: options.scriptTimeoutMs,
-        });
-        progress('scenes:done', `${s.length} scenes`);
-        return s;
-      })(),
+    // Run sequentially to avoid Python process contention on Windows.
+    // Contact sheet first (reads frame images), then scene detection (opens video file).
+    progress('contact-sheet:start');
+    const contactSheetResult = await generateContactSheet(framesDir, contactSheetPath, {
+      cols: options.contactSheetCols,
+      timeoutMs: options.scriptTimeoutMs,
+    });
+    progress('contact-sheet:done', contactSheetResult);
 
-      (async () => {
-        progress('contact-sheet:start');
-        const p = await generateContactSheet(framesDir, contactSheetPath, {
-          cols: options.contactSheetCols,
-          timeoutMs: options.scriptTimeoutMs,
-        });
-        progress('contact-sheet:done', p);
-        return p;
-      })(),
-    ]);
+    progress('scenes:start');
+    let scenes;
+    try {
+      scenes = await detectScenes(sourcePath, {
+        threshold: options.sceneThreshold,
+        timeoutMs: options.scriptTimeoutMs,
+      });
+      progress('scenes:done', `${scenes.length} scenes`);
+    } catch (err) {
+      // Scene detection can crash intermittently on Windows.
+      // Fall back to treating the whole video as one scene.
+      progress('scenes:failed', err instanceof Error ? err.message : String(err));
+      console.error(`[ingest] Scene detection failed, using single-scene fallback: ${err}`);
+      // Estimate duration from frames (1 fps extraction = frame count ~ seconds)
+      const estimatedDuration = frames.length > 0 ? frames[frames.length - 1].timestamp : 0;
+      const fps = metadata.fps ?? 30;
+      scenes = [{ id: 'scene_000', startTime: 0, endTime: estimatedDuration, duration: estimatedDuration, startFrame: 0, endFrame: Math.round(estimatedDuration * fps) }];
+    }
 
     progress('ingest:done');
 

@@ -47,6 +47,7 @@ export async function understand(
       ingestResult.frames,
       ingestResult.contactSheets,
       provider,
+      true, // Use per-scene frame analysis for accurate visual descriptions
     ),
     extractEntities(segments, provider),
     extractTopics(segments, provider),

@@ -54,5 +54,8 @@ export async function edit(
   }
 
   progress('done', `Edit complete: ${timeline.clips.length} clips, ${(timeline.durationInFrames / timeline.fps).toFixed(1)}s`);
+  // Attach EDL to timeline for debugging/persistence
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (timeline as any)._edl = edl;
   return timeline;
 }

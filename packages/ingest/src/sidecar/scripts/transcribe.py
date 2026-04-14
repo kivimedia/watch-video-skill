@@ -93,7 +93,10 @@ def main() -> None:
     output_segments = []
     all_words = []
 
-    segments_list = list(segments_iter)
+    try:
+        segments_list = list(segments_iter)
+    except Exception as exc:
+        _fail(f"Transcription failed during inference: {exc}")
     total = len(segments_list) if segments_list else 1
 
     for idx, segment in enumerate(segments_list):
@@ -123,10 +126,13 @@ def main() -> None:
 
     _emit_progress(1.0, "done")
 
+    RTL_LANGUAGES = {"ar", "he", "fa", "ur", "yi", "ps", "sd", "ug", "ku", "dv", "ha", "syr"}
+
     result = {
         "words": all_words,
         "segments": output_segments,
         "language": detected_language,
+        "is_rtl": detected_language in RTL_LANGUAGES,
     }
     if duration is not None:
         result["duration"] = round(duration, 4)

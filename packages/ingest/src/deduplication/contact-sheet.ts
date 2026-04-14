@@ -9,8 +9,12 @@ import { ScriptRunner } from '../sidecar/runner.js';
 export interface ContactSheetOptions {
   /** Number of columns in the contact sheet grid. Defaults to 5. */
   cols?: number;
-  /** Maximum number of frames to include. Defaults to all frames. */
+  /** Width of each thumbnail in pixels. Defaults to 240. */
+  thumbWidth?: number;
+  /** Maximum number of frames to include (0 = all). Evenly samples when capped. */
   maxFrames?: number;
+  /** Max output size in KB. Defaults to 4000 (under Anthropic's 5MB limit). */
+  maxSizeKb?: number;
   /** Timeout in ms. Defaults to ScriptRunner default (10 min). */
   timeoutMs?: number;
 }
@@ -36,15 +40,21 @@ export async function generateContactSheet(
 
   const runner = new ScriptRunner();
   const cols = options.cols ?? 5;
+  const thumbWidth = options.thumbWidth ?? 240;
 
   const args = [
     '--frames-dir', framesDir.replace(/\\/g, '/'),
     '--output', outputPath.replace(/\\/g, '/'),
     '--cols', String(cols),
+    '--thumb-width', String(thumbWidth),
   ];
 
-  if (options.maxFrames !== undefined) {
+  if (options.maxFrames !== undefined && options.maxFrames > 0) {
     args.push('--max-frames', String(options.maxFrames));
+  }
+
+  if (options.maxSizeKb !== undefined) {
+    args.push('--max-size-kb', String(options.maxSizeKb));
   }
 
   const result = await runner.runScript<ContactSheetResult>(

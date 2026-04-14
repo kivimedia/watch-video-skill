@@ -92,6 +92,11 @@ export async function updateJob(id: string, partial: Partial<Job>): Promise<Job>
   return updated;
 }
 
+export async function deleteJob(id: string): Promise<void> {
+  const dir = getJobDir(id);
+  await fs.rm(dir, { recursive: true, force: true });
+}
+
 export async function listJobs(): Promise<Job[]> {
   await ensureRoot();
 
