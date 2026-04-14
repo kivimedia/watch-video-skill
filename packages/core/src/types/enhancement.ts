@@ -32,6 +32,9 @@ export type EnhancementDecisionReason =
 export type EnhancementType =
   | 'educational_zoom_callout'
   | 'animated_annotation'
+  | 'animated_title_card'
+  | 'animated_lower_third'
+  | 'voice_pulse_highlight'
   | 'diagram_reveal'
   | 'chart_animation'
   | 'feature_spotlight'
@@ -39,6 +42,48 @@ export type EnhancementType =
   | 'precision_zoom'
   | 'motion_explanation'
   | 'custom';
+
+// ─── Revideo Scene Parameters ───────────────────────────────
+
+export type RevideoSceneParams =
+  | TitleCardParams
+  | ZoomCalloutParams
+  | VoicePulseParams
+  | SpotlightParams
+  | LowerThirdParams;
+
+export interface TitleCardParams {
+  sceneType: 'title_card';
+  title: string;
+  subtitle?: string;
+  backgroundColor?: string;
+  textColor?: string;
+}
+
+export interface ZoomCalloutParams {
+  sceneType: 'zoom_callout';
+  targetRegion: { x: number; y: number; width: number; height: number };
+  zoomFactor?: number;
+}
+
+export interface VoicePulseParams {
+  sceneType: 'voice_pulse';
+  targetRegion: { x: number; y: number; width: number; height: number };
+  glowColor?: string;
+}
+
+export interface SpotlightParams {
+  sceneType: 'spotlight';
+  targetRegion: { x: number; y: number; width: number; height: number };
+  vignetteStrength?: number;
+}
+
+export interface LowerThirdParams {
+  sceneType: 'lower_third';
+  label: string;
+  sublabel?: string;
+  slideDirection?: 'left' | 'right';
+}
 
 // ─── Scene Enhancement Spec ──────────────────────────────────
 
@@ -56,6 +101,7 @@ export interface SceneEnhancementSpec {
   expectedOutputDurationSec: number;
   audioStrategy: AudioStrategy;
   replacementMode: TimelineReplacementMode;
+  sceneParams?: RevideoSceneParams;
 }
 
 export type CameraBehavior =
