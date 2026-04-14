@@ -19,6 +19,8 @@ import { checkVUDGate, checkEditGate } from '@cutsense/core';
 import { TrackedProvider } from '@cutsense/providers';
 import {
   render,
+  canUseFastRender,
+  renderWithFFmpeg,
   generateEnhancementSpecs,
   renderAllEnhancedScenes,
   applyEnhancementInserts,
@@ -340,20 +342,29 @@ export class JobOrchestrator {
   ): Promise<Job> {
     job = transitionJob(job, JobState.RENDERING);
     await updateJob(job.id, { state: job.state });
-    progress('render', 'starting', 'Rendering video with Remotion');
 
     try {
       const timeline = await loadJSON<CutSenseTimeline>(job.id, 'edit', 'timeline.json');
       const outputPath = getArtifactPath(job.id, 'output', 'output.mp4');
 
-      await render(timeline, outputPath, {
-        onProgress: ({ percent }) => {
-          progress('render', 'progress', `Rendering: ${percent}%`);
-        },
-        onBundleProgress: (p) => {
-          progress('render', 'bundling', `Bundling compositions: ${(p * 100).toFixed(0)}%`);
-        },
-      });
+      if (canUseFastRender(timeline)) {
+        progress('render', 'starting', 'Fast rendering with FFmpeg (lossless stream copy)');
+        await renderWithFFmpeg(timeline, outputPath, {
+          onProgress: ({ percent }) => {
+            progress('render', 'progress', `Rendering: ${percent}%`);
+          },
+        });
+      } else {
+        progress('render', 'starting', 'Rendering with Remotion');
+        await render(timeline, outputPath, {
+          onProgress: ({ percent }) => {
+            progress('render', 'progress', `Rendering: ${percent}%`);
+          },
+          onBundleProgress: (p) => {
+            progress('render', 'bundling', `Bundling compositions: ${(p * 100).toFixed(0)}%`);
+          },
+        });
+      }
 
       job = transitionJob(job, JobState.RENDER_DONE);
       await updateJob(job.id, { state: job.state });

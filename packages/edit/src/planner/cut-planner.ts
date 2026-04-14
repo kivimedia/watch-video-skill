@@ -29,13 +29,13 @@ export async function planCuts(
 
 Rules:
 - Respect the user's instruction precisely - this is the highest priority
-- When the instruction references a specific person, appearance, or visual element, use the "visual" field in each segment to determine which segments show that person/element. REMOVE all segments that do not match.
+- When the instruction references a specific person, appearance, or visual element, use the "visual" field in each segment to determine which segments show that person/element. REMOVE segments that clearly show a DIFFERENT person or an empty stage. KEEP segments where the visual description is absent (NONE) but the segment falls within a time range between two segments that DO match the target person.
+- When a segment has no visual description, infer from context: if neighboring segments show the target person, this segment likely does too.
 - Prefer high-energy, visually interesting segments
 - If a target duration is given, get as close as possible
 - Explain WHY each major segment was kept or removed
 - Avoid cutting mid-word or mid-gesture when possible
 - Consider narrative flow and pacing
-- When in doubt about whether a segment matches the instruction, REMOVE it rather than keep it
 
 Return ONLY valid JSON:
 {

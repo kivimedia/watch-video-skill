@@ -23,9 +23,9 @@ export async function edit(
   progress('planning', 'Generating edit decision list');
   const edl = await planCuts(vud, instruction, provider, options.targetDuration);
 
-  // Override caption mode if specified in options
-  if (options.captionStyle && options.captionStyle !== 'none') {
-    edl.captionMode = options.captionStyle;
+  // Override caption mode from user options (including forcing 'none')
+  if (options.captionStyle !== undefined) {
+    edl.captionMode = options.captionStyle === 'none' ? 'none' : options.captionStyle;
   }
 
   // 2. Analyze pacing
