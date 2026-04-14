@@ -6,5 +6,5 @@
     "jsx": "react-jsx"
   },
   "include": ["src"],
-  "exclude": ["src/composition"]
+  "exclude": ["src/composition", "src/revideo/scenes", "src/revideo/project-template.ts"]
 }

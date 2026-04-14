@@ -4,14 +4,16 @@
  * Renders individual enhanced scenes as standalone video assets.
  * These assets are later inserted into the Remotion master timeline.
  *
- * NOTE: Revideo is an optional dependency. If not installed, this
- * module gracefully falls back to standard rendering.
+ * Uses Revideo (@revideo/renderer) for standalone animations (title cards,
+ * lower thirds) and enhanced FFmpeg filters for source-video effects
+ * (zoom callouts, spotlight, voice pulse).
  */
 
 import type { SceneEnhancementSpec, InsertRenderResult } from '@cutsense/core';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
+import { renderTitleCard, isRevideoAvailable } from '../revideo/render.js';
 
 export interface RevideoRenderOptions {
   outputDir: string;
@@ -36,11 +38,16 @@ export async function renderEnhancedScene(
 
   try {
     options.onProgress?.(spec.sceneId, 0);
+    mkdirSync(dirname(outputPath), { recursive: true });
 
-    // For v1: use FFmpeg-based enhancement (zoom, crop, overlay text)
-    // This provides immediate value while the full Revideo integration
-    // is built out in Phase 3
-    await renderWithFFmpeg(spec, outputPath);
+    // Route to Revideo for standalone animations, FFmpeg for source-video effects
+    const useRevideo = isRevideoAvailable() && isRevideoEnhancement(spec.enhancementType);
+
+    if (useRevideo) {
+      await renderWithRevideo(spec, outputPath, options);
+    } else {
+      await renderWithFFmpeg(spec, outputPath);
+    }
 
     options.onProgress?.(spec.sceneId, 100);
 
@@ -85,8 +92,47 @@ export async function renderAllEnhancedScenes(
 }
 
 /**
- * FFmpeg-based enhancement rendering (v1 implementation).
- * Creates enhanced video segments using FFmpeg filters.
+ * Determine if an enhancement type should use Revideo (standalone animations)
+ * vs FFmpeg (source-video manipulation).
+ */
+function isRevideoEnhancement(type: string): boolean {
+  // Title cards and lower thirds are standalone - perfect for Revideo
+  return ['animated_annotation', 'custom'].includes(type);
+}
+
+/**
+ * Revideo-based enhancement rendering.
+ * Creates standalone animated segments using @revideo/renderer.
+ */
+async function renderWithRevideo(
+  spec: SceneEnhancementSpec,
+  outputPath: string,
+  options: RevideoRenderOptions,
+): Promise<void> {
+  const title = spec.overlayText?.[0] ?? 'Untitled';
+  const subtitle = spec.overlayText?.[1] ?? '';
+
+  const result = await renderTitleCard(
+    title,
+    subtitle,
+    spec.expectedOutputDurationSec,
+    {
+      outputDir: dirname(outputPath),
+      onProgress: (pct) => options.onProgress?.(spec.sceneId, pct),
+    },
+  );
+
+  // Move rendered file to expected output path if different
+  if (result !== outputPath) {
+    const { renameSync } = await import('node:fs');
+    renameSync(result, outputPath);
+  }
+}
+
+/**
+ * FFmpeg-based enhancement rendering.
+ * Creates enhanced video segments using FFmpeg filters for effects
+ * that need source video access (zoom, spotlight, voice pulse).
  */
 async function renderWithFFmpeg(
   spec: SceneEnhancementSpec,
@@ -117,34 +163,66 @@ async function renderWithFFmpeg(
 
 function buildFFmpegFilters(spec: SceneEnhancementSpec): string[] {
   const filters: string[] = [];
+  const vfParts: string[] = [];
 
+  // Camera behavior
   switch (spec.cameraBehavior) {
     case 'zoom_in_hold_zoom_out': {
-      // Ken Burns style zoom: 1x -> 1.3x -> 1x over the duration
       const dur = spec.expectedOutputDurationSec;
-      const zoomExpr = `if(lt(t,${dur * 0.3}),1+0.3*t/${dur * 0.3},if(lt(t,${dur * 0.7}),1.3,1.3-0.3*(t-${dur * 0.7})/${dur * 0.3}))`;
-      filters.push('-vf', `zoompan=z='${zoomExpr}':d=1:s=1920x1080:fps=30`);
+      const zoomIn = dur * 0.25;
+      const holdEnd = dur * 0.75;
+      const zoomExpr = `if(lt(t,${zoomIn}),1+0.4*t/${zoomIn},if(lt(t,${holdEnd}),1.4,1.4-0.4*(t-${holdEnd})/${dur - holdEnd}))`;
+      vfParts.push(`zoompan=z='${zoomExpr}':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1328x1028:fps=30`);
       break;
     }
     case 'steady_zoom_in': {
       const dur = spec.expectedOutputDurationSec;
-      filters.push('-vf', `zoompan=z='1+0.3*on/(${dur}*30)':d=1:s=1920x1080:fps=30`);
+      vfParts.push(`zoompan=z='1+0.4*on/(${dur}*30)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=1328x1028:fps=30`);
       break;
     }
     case 'static_with_overlay': {
-      // Add text overlay if available
+      // Lower third: semi-transparent bar with text at bottom
       if (spec.overlayText?.length) {
-        const text = spec.overlayText[0]!.replace(/'/g, "\\'");
-        filters.push(
-          '-vf',
-          `drawtext=text='${text}':fontsize=48:fontcolor=white:borderw=3:bordercolor=black:x=(w-tw)/2:y=h-80`,
-        );
+        const text = spec.overlayText[0]!.replace(/'/g, "\u2018").replace(/:/g, '\\:');
+        // Dark bar at bottom
+        vfParts.push(`drawbox=x=0:y=ih-90:w=500:h=60:color=black@0.8:t=fill`);
+        // Accent line
+        vfParts.push(`drawbox=x=0:y=ih-90:w=4:h=60:color=0x3b82f6:t=fill`);
+        // Text
+        vfParts.push(`drawtext=text='${text}':fontsize=24:fontcolor=white:x=20:y=ih-72:fontfile=C\\\\:/Windows/Fonts/segoeui.ttf`);
       }
       break;
     }
     default:
-      // No special filter
       break;
+  }
+
+  // Enhancement type specific effects
+  switch (spec.enhancementType) {
+    case 'feature_spotlight': {
+      // Vignette effect - darken edges, bright center
+      vfParts.push(`vignette=PI/4`);
+      break;
+    }
+    case 'educational_zoom_callout': {
+      // If no zoom camera behavior already set, add a gentle zoom
+      if (!spec.cameraBehavior || spec.cameraBehavior === 'custom') {
+        const dur = spec.expectedOutputDurationSec;
+        vfParts.push(`zoompan=z='1+0.2*on/(${dur}*30)':d=1:x='iw/2-(iw/zoom/2)':y='ih/3-(ih/zoom/3)':s=1328x1028:fps=30`);
+      }
+      break;
+    }
+    case 'object_emphasis': {
+      // Subtle brightness/contrast boost
+      vfParts.push(`eq=brightness=0.05:contrast=1.1`);
+      break;
+    }
+    default:
+      break;
+  }
+
+  if (vfParts.length > 0) {
+    filters.push('-vf', vfParts.join(','));
   }
 
   // Audio strategy

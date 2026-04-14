@@ -28,13 +28,13 @@ export const VALID_TRANSITIONS: ReadonlyMap<JobState, ReadonlySet<JobState>> = n
     JobState.EDITING,
     new Set([JobState.EDIT_DONE, JobState.EDIT_FAILED, JobState.CANCELLED]),
   ],
-  [JobState.EDIT_DONE, new Set([JobState.RENDERING, JobState.CANCELLED])],
+  [JobState.EDIT_DONE, new Set([JobState.RENDERING, JobState.EDITING, JobState.CANCELLED])],
   [JobState.EDIT_FAILED, new Set()],
   [
     JobState.RENDERING,
     new Set([JobState.RENDER_DONE, JobState.RENDER_FAILED, JobState.CANCELLED]),
   ],
-  [JobState.RENDER_DONE, new Set()],
+  [JobState.RENDER_DONE, new Set([JobState.EDITING, JobState.CANCELLED])],
   [JobState.RENDER_FAILED, new Set()],
   [JobState.CANCELLED, new Set()],
 ]);

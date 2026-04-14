@@ -16,10 +16,27 @@ export function buildTimeline(
     const seg = vud.segments.find((s) => s.id === decision.segmentId);
     if (!seg) continue;
 
-    const startTime = decision.trimStart ?? seg.startTime;
-    const endTime = decision.trimEnd ?? seg.endTime;
+    // Clamp trim values to segment boundaries and ensure positive duration
+    let startTime = decision.trimStart ?? seg.startTime;
+    let endTime = decision.trimEnd ?? seg.endTime;
+
+    // Guard: trim values must be within segment bounds
+    startTime = Math.max(startTime, seg.startTime);
+    endTime = Math.min(endTime, seg.endTime);
+
+    // Guard: ensure positive duration
+    if (endTime <= startTime) {
+      // Fallback to full segment
+      startTime = seg.startTime;
+      endTime = seg.endTime;
+    }
+
     const durationSec = endTime - startTime;
+    if (durationSec <= 0) continue; // Skip zero-length clips
+
     const durationInFrames = Math.round(durationSec * fps);
+    if (durationInFrames <= 0) continue;
+
     const startFrom = Math.round(startTime * fps);
 
     const transitionType = decision.transitionBefore ?? edl.transitionDefault;

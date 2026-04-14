@@ -12,11 +12,12 @@ export async function planCuts(
         `${s.id}: ${s.startTime.toFixed(1)}s-${s.endTime.toFixed(1)}s (${s.duration.toFixed(1)}s)`,
         `energy=${s.energy.toFixed(2)}`,
       ];
-      if (s.transcript) parts.push(`"${s.transcript.slice(0, 120)}"`);
-      if (s.visualDescription) parts.push(`visual="${s.visualDescription.slice(0, 200)}"`);
+      if (s.transcript) parts.push(`audio="${s.transcript.slice(0, 120)}"`);
+      if (s.textOnScreen) parts.push(`screen_text="${s.textOnScreen.slice(0, 200)}"`);
+      if (s.visualDescription) parts.push(`visual="${s.visualDescription.slice(0, 150)}"`);
       if (s.sceneType) parts.push(`type=${s.sceneType}`);
-      if (s.visualInterest) parts.push(`visual_interest=${s.visualInterest}`);
-      if (s.topics.length) parts.push(`topics=[${s.topics.join(',')}]`);
+      if (s.visualInterest) parts.push(`interest=${s.visualInterest}`);
+      if (s.isSilent) parts.push('SILENT');
       return parts.join(' | ');
     })
     .join('\n');
@@ -25,22 +26,24 @@ export async function planCuts(
     [
       {
         role: 'system',
-        content: `You are a professional video editor. Given a Video Understanding Document and user instructions, decide which segments to keep, trim, or remove.
+        content: `You are a professional video editor creating polished demo/highlight videos. Given segments from a video and user instructions, decide which segments to keep, trim, or remove.
 
-Rules:
-- Respect the user's instruction precisely - this is the highest priority
-- When the instruction references a specific person, appearance, or visual element, use the "visual" field in each segment to determine which segments show that person/element. REMOVE segments that clearly show a DIFFERENT person or an empty stage. KEEP segments where the visual description is absent (NONE) but the segment falls within a time range between two segments that DO match the target person.
-- When a segment has no visual description, infer from context: if neighboring segments show the target person, this segment likely does too.
-- Prefer high-energy, visually interesting segments
-- If a target duration is given, get as close as possible
-- Explain WHY each major segment was kept or removed
-- Avoid cutting mid-word or mid-gesture when possible
-- Consider narrative flow and pacing
+CRITICAL RULES:
+1. Respect the user's instruction precisely - this is the highest priority.
+2. PRESERVE NARRATIVE FLOW: For demo/tutorial videos, every question or prompt from the user MUST be followed by the system's response. Never show an answer without the question that triggered it. Never show a question without its answer.
+3. The "screen_text" field shows what text is visible on screen (UI text, chat messages, bot responses). For screen recordings, this is often MORE important than the audio transcript. Use it to understand what the user typed/asked and what the system responded.
+4. TRIM VALUES: If you use trimStart/trimEnd, they MUST be within the segment's time range. trimStart >= segment start time. trimEnd <= segment end time. If you don't need to trim, use null for both.
+5. Remove dead air (silent segments with no visual change), loading screens, browser navigation that isn't part of the demo, and idle scrolling.
+6. Keep segments where the user asks a question (via voice or text visible on screen) AND the segments where the system responds.
+7. Prefer high-energy, visually interesting segments.
+8. If a target duration is given, get as close as possible.
+9. Avoid cutting mid-word or mid-sentence.
+10. For screen recordings: keep the full question-answer cycle even if individual segments are low energy.
 
-Return ONLY valid JSON:
+Return ONLY valid JSON (no markdown, no prose):
 {
   "decisions": [
-    {"segmentId": "seg_001", "action": "keep|trim|remove", "reason": "...", "trimStart": null, "trimEnd": null}
+    {"segmentId": "seg_001", "action": "keep|trim|remove", "reason": "brief reason", "trimStart": null, "trimEnd": null}
   ],
   "captionMode": "none|standard|jumbo|jumbo-then-standard",
   "transitionDefault": "cut|fade|mixed"
@@ -92,14 +95,33 @@ ${segmentData}`,
     }
 
     const decisions: EditDecision[] = (parsed.decisions ?? []).map(
-      (d: Record<string, unknown>) => ({
-        segmentId: String(d.segmentId ?? ''),
-        action: (d.action as EditDecision['action']) ?? 'keep',
-        reason: String(d.reason ?? ''),
-        trimStart: typeof d.trimStart === 'number' ? d.trimStart : undefined,
-        trimEnd: typeof d.trimEnd === 'number' ? d.trimEnd : undefined,
-        transitionBefore: d.transitionBefore as EditDecision['transitionBefore'],
-      }),
+      (d: Record<string, unknown>) => {
+        const segId = String(d.segmentId ?? '');
+        const seg = vud.segments.find((s) => s.id === segId);
+
+        let trimStart = typeof d.trimStart === 'number' ? d.trimStart : undefined;
+        let trimEnd = typeof d.trimEnd === 'number' ? d.trimEnd : undefined;
+
+        // Post-process: clamp trim values to segment boundaries
+        if (seg) {
+          if (trimStart !== undefined) trimStart = Math.max(trimStart, seg.startTime);
+          if (trimEnd !== undefined) trimEnd = Math.min(trimEnd, seg.endTime);
+          if (trimStart !== undefined && trimEnd !== undefined && trimEnd <= trimStart) {
+            // Invalid trim range - use full segment
+            trimStart = undefined;
+            trimEnd = undefined;
+          }
+        }
+
+        return {
+          segmentId: segId,
+          action: (d.action as EditDecision['action']) ?? 'keep',
+          reason: String(d.reason ?? ''),
+          trimStart,
+          trimEnd,
+          transitionBefore: d.transitionBefore as EditDecision['transitionBefore'],
+        };
+      },
     );
 
     const keptSegments = decisions.filter((d) => d.action !== 'remove');
