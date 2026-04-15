@@ -96,6 +96,18 @@ cutsense clean --failed-only      # Only remove failed jobs
 cutsense clean job_20260414_ABC   # Remove a specific job
 ```
 
+## The Rendering Stack: Remotion + Revideo + FFmpeg
+
+CutSense has three rendering engines and picks the right one for each job:
+
+**FFmpeg (the fast lane)** - For cuts-only edits with no effects, CutSense uses FFmpeg stream copy. No re-encoding, no quality loss, renders in seconds. This is the default when you're just cutting and rearranging clips. Think of it as the assembly editor - fast, precise, lossless.
+
+**[Remotion](https://remotion.dev) (the editor)** - When the edit needs captions, transitions, fades, or overlays, CutSense compiles a React composition and renders it through Remotion's headless Chromium pipeline. Remotion treats video as code - every frame is a React component, every transition is a function. This gives CutSense programmatic control over the output that traditional NLEs can't match. Captions, title cards, picture-in-picture - all expressed as typed, version-controllable compositions.
+
+**[Revideo](https://re.video) (the motion designer)** - For premium segments that need motion graphics, animated text, or cinematic visual effects, CutSense hands off to Revideo. While Remotion handles the editorial timeline, Revideo handles individual scene enhancement - think of it as the After Effects artist sitting next to the Premiere Pro editor. The hybrid rendering pipeline stitches Revideo-enhanced segments back into the Remotion timeline seamlessly.
+
+The pipeline auto-selects: simple cuts get FFmpeg, edits with captions get Remotion, premium segments with effects get Revideo. One prompt, three engines, zero manual switching.
+
 ## Architecture
 
 CutSense is a pnpm monorepo with 10 packages:
@@ -164,7 +176,19 @@ The visual descriptions are what make person-filtering possible. Without them, t
 
 ## License
 
-Apache 2.0 - See [LICENSE](LICENSE)
+CutSense is licensed under Apache 2.0 - See [LICENSE](LICENSE)
+
+### Third-Party License Notice
+
+CutSense depends on several open-source projects with their own licenses:
+
+- **[Remotion](https://remotion.dev)** - Licensed under the [Remotion Free License](https://www.remotion.dev/docs/license), which is free for individuals and companies with 3 or fewer employees. Organizations with 4+ employees need a [Remotion Company License](https://www.remotion.dev/pricing) for commercial video rendering. CutSense does not sublicense Remotion - users must comply with Remotion's terms independently.
+- **[Revideo](https://re.video)** - MIT License. Fully open source.
+- **[FFmpeg](https://ffmpeg.org)** - LGPL v2.1+. CutSense calls FFmpeg as an external process (not linked). Users are responsible for their FFmpeg installation's license compliance. Standard builds from ffmpeg.org are LGPL.
+- **[faster-whisper](https://github.com/SYSTRAN/faster-whisper)** - MIT License.
+- **[PySceneDetect](https://www.scenedetect.com)** - BSD 3-Clause License.
+
+All other JavaScript/TypeScript dependencies are MIT or Apache 2.0 licensed.
 
 ---
 

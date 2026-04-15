@@ -1,0 +1,30 @@
+CutSense - AI Video Understanding & Programmatic Editing Engine
+Copyright 2026 Ziv Raviv / Kivi Media
+
+This product is licensed under the Apache License, Version 2.0.
+
+This product includes the following third-party software:
+
+Remotion (https://remotion.dev)
+  Licensed under the Remotion Free License.
+  Free for individuals and organizations with 3 or fewer employees.
+  Organizations with 4+ employees require a Remotion Company License.
+  See: https://www.remotion.dev/docs/license
+
+Revideo (https://re.video)
+  Licensed under the MIT License.
+
+FFmpeg (https://ffmpeg.org)
+  Licensed under LGPL v2.1+. Used as an external binary, not linked.
+
+faster-whisper (https://github.com/SYSTRAN/faster-whisper)
+  Licensed under the MIT License.
+
+PySceneDetect (https://www.scenedetect.com)
+  Licensed under the BSD 3-Clause License.
+
+Pillow (https://python-pillow.org)
+  Licensed under the HPND License.
+
+imagehash (https://github.com/JohannesBuchner/imagehash)
+  Licensed under the BSD 2-Clause License.
