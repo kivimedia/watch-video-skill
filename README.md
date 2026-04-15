@@ -1,4 +1,4 @@
-# CutSense (or Watch Video Skill)
+# Watch Video Skill (CutSense)
 TL;DR is a collection of agents that knows how to watch videos, by analyzing key images at a dynamic rate and the transcription of the video. It creates a unified understsanding of the combination of the sound and visuals and can edit your video based on instructions."
 
 Here are the deets: 
