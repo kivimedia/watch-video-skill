@@ -1,127 +1,174 @@
 # CutSense
 
-**AI Video Understanding & Programmatic Editing Engine**
+**The AI that actually watches your video, then edits it.**
 
-CutSense gives AI systems genuine understanding of video content, then uses that understanding to drive programmatic video editing. Unlike tools that work from transcripts alone, CutSense fuses audio transcription, visual scene analysis, and editorial intelligence into a structured **Video Understanding Document (VUD)** - the source of truth for all editing decisions.
+Most video editing tools work from transcripts. CutSense watches every frame, listens to every word, and builds a deep understanding of what's happening in your video. Then it uses that understanding to make real editorial decisions.
 
-The editing layer outputs compositions compatible with [Remotion](https://remotion.dev) (React-based video framework), producing edits expressed as code - fully version-controllable, parameterizable, and renderable in CI/CD pipelines.
+Tell it "keep only the parts where the singer appears" and it knows which segments show the singer, which show the MC reading, and which are empty stage shots. It removes what doesn't belong and renders a clean, lossless output.
+
+## What It Actually Did
+
+A 21-minute Holocaust Remembrance Day ceremony video. Multiple speakers, a young pianist/singer, readings, candle lighting. One prompt:
+
+> "Keep only the parts where the young woman with long curly brown hair appears. She plays keyboard and sings."
+
+CutSense:
+- Extracted 1,295 frames and transcribed 21 minutes of Hebrew speech
+- Used adaptive sampling to focus on moments with activity (322 frames kept from 1,295)
+- Analyzed every scene with vision AI, describing who is visible, what they're wearing, what they're doing
+- The edit planner matched the visual descriptions against the prompt and removed 80+ segments
+- FFmpeg rendered the final cut in 13 seconds with zero quality loss
+
+**Result: 5 minutes of just the singer. Original quality. $0.54 in API costs.**
 
 ## How It Works
 
 ```
-Video File -> [Ingest] -> [Understand] -> [Edit] -> [Render] -> output.mp4
-                |              |              |           |
-           FFmpeg/WhisperX  Vision LLM    Editorial   Remotion
-           PySceneDetect    + Fusion       LLM        headless
+Video File
+    |
+    v
+[INGEST]           FFmpeg frames + WhisperX transcript + PySceneDetect
+    |
+    v
+[ADAPTIVE SAMPLE]  Speech-aware frame density + visual change detection
+    |
+    v
+[UNDERSTAND]       Vision LLM builds a Video Understanding Document (VUD)
+    |
+    v
+[EDIT]             LLM cut-planner with visual descriptions + natural language prompt
+    |
+    v
+[RENDER]           FFmpeg lossless stream copy (cuts-only) or Remotion (effects/captions)
+    |
+    v
+output.mp4
 ```
 
-**Layer 1 - Ingest**: Extracts frames, audio, transcript (word-level), scenes, metadata, and loudness from any video file.
+## What CutSense Does Well
 
-**Layer 2 - Understand**: Synthesizes raw signals into a VUD - a structured JSON timeline with visual descriptions, entity tracking, topic modeling, and energy scoring.
+**Person filtering** - "Keep only the CEO talking." CutSense describes each person's appearance (age, hair, clothing, activity) per scene, then the edit planner matches against your description. Not face recognition - visual understanding.
 
-**Layer 3 - Edit**: Takes the VUD plus natural language instructions and produces a Remotion timeline with cuts, transitions, and captions.
+**Adaptive frame sampling** - Static scenes (someone sitting at a piano for 3 minutes) don't need a frame every second. Speech moments do. CutSense uses WhisperX timestamps to sample densely during speech and sparsely during silence, then refines with pHash visual change detection. The result: 2.5x more useful frames without re-extracting from the video.
 
-**Render**: Remotion renders the timeline to MP4 via headless Chromium.
+**Lossless rendering** - For cuts-only edits (no captions, no fades), CutSense auto-selects FFmpeg stream copy instead of re-encoding through Remotion. Your output is pixel-identical to the source. A 5-minute edit renders in 13 seconds, not 20 minutes.
+
+**Hebrew and RTL** - Full bidirectional text support. Hebrew transcription via WhisperX, RTL captions, right-to-left layout detection. Built for real-world multilingual content.
+
+**Multi-provider AI** - Works with Claude, GPT-4o, Gemini. Built-in cost tracking and model routing so you don't burn through API credits.
+
+**Cost governance** - Every pipeline run reports exact token usage and cost. The ceremony video edit cost $0.54 total across ingest, understand, and edit stages.
 
 ## Quick Start
 
 ```bash
-# Install
-npm install -g @cutsense/cli
+# Clone and install
+git clone https://github.com/kivimedia/watch-video-skill.git
+cd watch-video-skill
+pnpm install
+pnpm turbo build
 
-# Full pipeline: understand and edit a video
-cutsense run interview.mp4 --prompt "Cut to 2 minutes, keep the best moments"
+# Run the full pipeline
+node packages/cli/bin/cutsense.js run video.mp4 \
+  --prompt "Cut to 2 minutes, keep the highlights" \
+  --captions none
 
-# Step by step
-cutsense ingest interview.mp4
-cutsense understand job_20260410_abc --provider anthropic
-cutsense edit job_20260410_abc --prompt "Highlight reel, add jumbo captions"
-cutsense render job_20260410_abc --output highlight.mp4
+# Check job status
+node packages/cli/bin/cutsense.js status
+
+# Clean up old jobs (frees disk space)
+node packages/cli/bin/cutsense.js clean --dry-run
+node packages/cli/bin/cutsense.js clean --all
 ```
 
-## Features
+### Clean Command Options
 
-- **Multi-modal understanding** - Fuses transcript, visual analysis, and audio signals
-- **Entity tracking** - Identifies and tracks people, products, locations across the timeline
-- **Visual interest scoring** - Rates segments 1-5 based on composition, action, uniqueness
-- **Caption engine** - Standard subtitles and TikTok-style jumbo word-by-word captions
-- **Hebrew & RTL** - Full bidirectional text support for Hebrew, Arabic, and mixed content
-- **Multi-provider AI** - Works with Claude, GPT-4o, Gemini, or local models
-- **MORE AI mode** - Enhanced understanding at higher cost (emotion tracking, pacing analysis, B-roll suggestions)
-- **Cost governance** - Built-in model routing, budget tracking, and cost-per-minute reporting
-- **Agent runtime** - Orchestrator with workers, reviewers, repair agents, and stage gates
-- **Operator dashboard** - Next.js UI for job management, VUD inspection, and cost monitoring
-
-## Requirements
-
-- Node.js >= 20
-- Python >= 3.10 (auto-configured on first run)
-- FFmpeg (must be on PATH)
-- At least one AI provider API key (Anthropic, OpenAI, or Google)
+```bash
+cutsense clean                    # Remove all completed/failed jobs
+cutsense clean --dry-run          # Preview what would be deleted
+cutsense clean --keep-latest 3    # Keep 3 most recent jobs
+cutsense clean --failed-only      # Only remove failed jobs
+cutsense clean job_20260414_ABC   # Remove a specific job
+```
 
 ## Architecture
 
 CutSense is a pnpm monorepo with 10 packages:
 
-| Package | Description |
+| Package | What it does |
 |---------|-------------|
-| `@cutsense/core` | Types, state machine, schemas, cost tracking, RTL utils |
-| `@cutsense/storage` | Job and artifact persistence |
-| `@cutsense/ingest` | Layer 1: FFmpeg, WhisperX, PySceneDetect extractors |
-| `@cutsense/providers` | Multi-provider AI adapters |
-| `@cutsense/understand` | Layer 2: VUD generation via LLM fusion |
-| `@cutsense/edit` | Layer 3: Editorial intelligence and timeline builder |
-| `@cutsense/renderer` | Remotion composition and headless rendering |
-| `@cutsense/agent` | Orchestrator, workers, reviewers, repair agents |
-| `@cutsense/cli` | Commander.js CLI |
-| `@cutsense/dashboard` | Next.js operator dashboard |
+| `@cutsense/core` | Types, state machine, cost tracking, RTL utils |
+| `@cutsense/storage` | Job and artifact persistence to `~/.cutsense/jobs/` |
+| `@cutsense/ingest` | FFmpeg frame extraction, WhisperX transcription, PySceneDetect |
+| `@cutsense/providers` | Anthropic, OpenAI, Gemini adapters with cost tracking |
+| `@cutsense/understand` | Adaptive sampling, vision analysis, VUD generation |
+| `@cutsense/edit` | LLM cut-planner, caption engine, timeline builder |
+| `@cutsense/renderer` | FFmpeg lossless render + Remotion compositions for effects |
+| `@cutsense/agent` | Pipeline orchestrator with stage gates and repair loops |
+| `@cutsense/cli` | Commander.js CLI with run, status, and clean commands |
+| `@cutsense/dashboard` | Next.js operator UI for job management and VUD inspection |
 
 ## The Video Understanding Document (VUD)
 
-The VUD is the core abstraction - a structured JSON timeline that an LLM can reason over:
+The VUD is the core abstraction. It's a structured JSON timeline that describes every segment of your video with enough detail for an LLM to make editorial decisions:
 
 ```json
 {
-  "version": "1.0",
   "segments": [
     {
-      "startTime": 14.2,
-      "endTime": 18.7,
-      "transcript": "...and that is when we decided to pivot",
-      "visualDescription": "Speaker leans forward, holding prototype",
-      "energy": 0.9,
-      "topics": ["product-pivot"],
-      "entities": ["speaker_1", "prototype"]
+      "startTime": 540.0,
+      "endTime": 589.0,
+      "transcript": "שירה עברית...",
+      "visualDescription": "A young woman with long dark hair wearing a cream top sits at a keyboard on the left side of the stage, playing and singing",
+      "energy": 0.85,
+      "sceneType": "performance",
+      "topics": ["music", "ceremony"]
     }
-  ],
-  "entities": [
-    { "name": "Danny", "type": "person", "role": "CEO", "totalScreenTime": 142.5 }
   ]
 }
 ```
 
-## Running the Dashboard
+The visual descriptions are what make person-filtering possible. Without them, the edit planner is blind.
 
-```bash
-cd packages/dashboard
-npx next dev --port 3847
-```
+## What's In Progress
 
-Opens at `http://localhost:3847` with pages for Jobs, Costs, and Policies.
+**Person-matching precision** - The edit planner sometimes includes segments with the wrong person when visual descriptions are ambiguous (two women in white tops at the same mic). The next step is structured person tracking across segments, so "Person A = young woman, curly hair, keyboard" is a persistent identity, not re-described every scene.
 
-**Important: local storage only.** The dashboard reads job data directly from `~/.cutsense/jobs/` on the local filesystem. It shows only jobs created on the machine it runs on. There is no database or API layer in v1.
+**Revideo integration** - Hybrid rendering where premium segments get motion graphics, animated titles, or visual effects via Revideo, while standard segments use FFmpeg stream copy. The architecture is in place, the rendering bridge is being built.
 
-To deploy to Vercel or any cloud host, you would need to add one of:
-- A REST API that reads from a shared database (Supabase, Postgres, etc.)
-- A file sync layer (S3, GCS) that mirrors the jobs directory
-- A WebSocket bridge to a machine running the CLI
+**Evaluation framework** - Benchmark corpus and automated eval tracks to measure edit quality, person-filtering accuracy, and cost efficiency across different video types.
 
-This is by design for v1 - CutSense is a CLI-first tool. The dashboard is an operator companion, not a standalone SaaS.
+**Multi-camera support** - Handling videos with multiple camera angles and synced audio tracks.
+
+## Known Limits
+
+**WhisperX on Windows** - The faster-whisper/CTranslate2 transcription engine crashes intermittently on Windows due to memory-mapped model file handle contention. CutSense handles this gracefully (continues without transcript), but the root cause is in the C extension layer. Runs reliably on Linux/Mac.
+
+**Vision model quality** - Visual descriptions are only as good as the vision model's frame analysis. Dark, low-contrast scenes or small faces in wide shots produce vague descriptions ("person on stage" instead of "young woman with curly brown hair playing keyboard"). Adaptive sampling helps but can't fix what the model can't see.
+
+**Frame deduplication** - Very long static scenes (10+ minutes of the same shot) may still have gaps in visual coverage even with adaptive sampling. The 5-second speech interval and 15-second silent interval cover most cases, but edge cases exist.
+
+**Single video input** - CutSense processes one video file at a time. No multi-file merge, no timeline import from NLEs.
+
+## Requirements
+
+- Node.js >= 20
+- Python >= 3.10 (auto-configured on first run)
+- FFmpeg on PATH
+- At least one API key: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, or `GOOGLE_AI_API_KEY`
 
 ## License
 
 Apache 2.0 - See [LICENSE](LICENSE)
 
-## Author
+---
 
-Ziv Raviv / [Kivi Media](https://kivimedia.co)
+## Built by Kivi Media
+
+CutSense is built by [Kivi Media](https://kivimedia.co), an AI-first agency that builds intelligent automation for businesses.
+
+We build AI agents that actually work - not demos, not proofs of concept, but production systems that run every day. CutSense is one example. We have 100 more.
+
+**If you need AI agents built for your business - 100 agents in 90 days - talk to us.**
+
+[kivimedia.co/strategy](https://kivimedia.co/strategy)
