@@ -1,16 +1,20 @@
-# CutSense
+# CutSense (or Watch Video Skill) is a collection of agents that knows how to watch videos, by analyzing key images at a dynamic rate and the transcription of the video. It creates a unified understsanding of the combination of the sound and visuals and can edit your video based on instructions."
 
+Here are the deets: 
 **The AI that actually watches your video, then edits it.**
 
 Most video editing tools work from transcripts. CutSense watches every frame, listens to every word, and builds a deep understanding of what's happening in your video. Then it uses that understanding to make real editorial decisions.
 
 Tell it "keep only the parts where the singer appears" and it knows which segments show the singer, which show the MC reading, and which are empty stage shots. It removes what doesn't belong and renders a clean, lossless output.
+Other examples:
+"Keep only the shots where I look confident and speak coherently without anyone walking behind me." - it will not just do that based on your transcript but also based on the visuals
+"I want to add more pazzaz to this video. Add cool animations and text captions that makes this feel fun. 50s quick pace edit please."
 
-## What It Actually Did
+## A case study detaield 
 
-A 21-minute Holocaust Remembrance Day ceremony video. Multiple speakers, a young pianist/singer, readings, candle lighting. One prompt:
+A 21-minute ceremony video. Multiple speakers, a young pianist/singer, readings, candle lighting. One prompt:
 
-> "Keep only the parts where the young woman with long curly brown hair appears. She plays keyboard and sings."
+> "Keep only the parts where the young woman with the white shirt appears. She plays keyboard and sings."
 
 CutSense:
 - Extracted 1,295 frames and transcribed 21 minutes of Hebrew speech
@@ -118,7 +122,7 @@ The VUD is the core abstraction. It's a structured JSON timeline that describes 
     {
       "startTime": 540.0,
       "endTime": 589.0,
-      "transcript": "שירה עברית...",
+      "transcript": "singing...",
       "visualDescription": "A young woman with long dark hair wearing a cream top sits at a keyboard on the left side of the stage, playing and singing",
       "energy": 0.85,
       "sceneType": "performance",
@@ -167,7 +171,7 @@ Apache 2.0 - See [LICENSE](LICENSE)
 
 CutSense is built by [Kivi Media](https://kivimedia.co), an AI-first agency that builds intelligent automation for businesses.
 
-We build AI agents that actually work - not demos, not proofs of concept, but production systems that run every day. CutSense is one example. We have 100 more.
+We build AI agents that actually work - not demos, not proofs of concept, but production systems that run every day. CutSense is one example. We have 274 more.
 
 **If you need AI agents built for your business - 100 agents in 90 days - talk to us.**
 
