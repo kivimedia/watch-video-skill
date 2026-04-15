@@ -106,7 +106,7 @@ CutSense has three rendering engines and picks the right one for each job:
 
 **[Revideo](https://re.video) (the motion designer)** - For premium segments that need motion graphics, animated text, or cinematic visual effects, CutSense hands off to Revideo. While Remotion handles the editorial timeline, Revideo handles individual scene enhancement - think of it as the After Effects artist sitting next to the Premiere Pro editor. The hybrid rendering pipeline stitches Revideo-enhanced segments back into the Remotion timeline seamlessly.
 
-The pipeline auto-selects: simple cuts get FFmpeg, edits with captions get Remotion, premium segments with effects get Revideo. One prompt, three engines, zero manual switching.
+CutSense uses both Remotion and Revideo together - not one or the other. Remotion owns the editorial timeline. Revideo owns the visual effects. FFmpeg handles the speed lane. The pipeline auto-selects which engine handles each segment. One prompt, three engines, zero manual switching. You get the full power of both frameworks in a single pipeline.
 
 ## Architecture
 
@@ -151,7 +151,7 @@ The visual descriptions are what make person-filtering possible. Without them, t
 
 **Person-matching precision** - The edit planner sometimes includes segments with the wrong person when visual descriptions are ambiguous (two women in white tops at the same mic). The next step is structured person tracking across segments, so "Person A = young woman, curly hair, keyboard" is a persistent identity, not re-described every scene.
 
-**Revideo integration** - Hybrid rendering where premium segments get motion graphics, animated titles, or visual effects via Revideo, while standard segments use FFmpeg stream copy. The architecture is in place, the rendering bridge is being built.
+**Revideo scene library** - Expanding the library of Revideo-powered scene enhancements - animated lower thirds, kinetic typography, data visualizations, cinematic transitions. The hybrid rendering pipeline is live, now it's about building more scene types.
 
 **Evaluation framework** - Benchmark corpus and automated eval tracks to measure edit quality, person-filtering accuracy, and cost efficiency across different video types.
 
