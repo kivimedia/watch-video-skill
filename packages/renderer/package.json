@@ -21,6 +21,7 @@
     "@revideo/2d": "0.10.4",
     "@revideo/core": "0.10.4",
     "@revideo/renderer": "0.10.4",
+    "@revideo/ui": "0.10.4",
     "@revideo/vite-plugin": "0.10.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
