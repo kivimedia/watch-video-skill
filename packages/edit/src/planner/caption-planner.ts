@@ -19,26 +19,46 @@ export function planCaptions(
   const track: CaptionChunk[] = [];
   let frameOffset = 0;
 
+  // Whisper occasionally emits words with start == end (typical for tiny
+  // interjections or alignment artifacts like a leading-space " that").
+  // Remotion requires endFrame > startFrame or durationInFrames is 0 and
+  // the whole render crashes. We guarantee a minimum 1-frame duration
+  // here and drop whitespace-only tokens entirely.
+  const pushChunk = (
+    text: string,
+    relStartSec: number,
+    relEndSec: number,
+    highlight: boolean | undefined,
+  ) => {
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+    const startFrame = frameOffset + Math.round(relStartSec * fps);
+    const endFromWhisper = frameOffset + Math.round(relEndSec * fps);
+    const endFrame = Math.max(endFromWhisper, startFrame + 1);
+    track.push({
+      text,
+      startFrame,
+      endFrame,
+      direction: detectTextDirection(text),
+      ...(highlight !== undefined ? { highlight } : {}),
+    });
+  };
+
   for (const seg of keptSegments) {
     const segStart = seg.trimStart ?? seg.startTime;
     const segEnd = seg.trimEnd ?? seg.endTime;
     const words = seg.words.filter((w) => w.start >= segStart && w.end <= segEnd);
 
     if (edl.captionMode === 'jumbo') {
-      // One word at a time
       for (const word of words) {
-        const relativeStart = word.start - segStart;
-        const relativeEnd = word.end - segStart;
-        track.push({
-          text: word.text,
-          startFrame: frameOffset + Math.round(relativeStart * fps),
-          endFrame: frameOffset + Math.round(relativeEnd * fps),
-          direction: detectTextDirection(word.text),
-          highlight: false,
-        });
+        pushChunk(
+          word.text,
+          word.start - segStart,
+          word.end - segStart,
+          false,
+        );
       }
     } else {
-      // Standard: group into chunks of max 5 words or 2 seconds
       const maxWords = 5;
       const maxDuration = 2;
       let chunkWords: typeof words = [];
@@ -53,28 +73,23 @@ export function planCaptions(
         const chunkDuration = (word.end - segStart) - chunkStart;
 
         if (chunkWords.length >= maxWords || chunkDuration >= maxDuration) {
-          const text = chunkWords.map((w) => w.text).join(' ');
-          const chunkEnd = word.end - segStart;
-          track.push({
-            text,
-            startFrame: frameOffset + Math.round(chunkStart * fps),
-            endFrame: frameOffset + Math.round(chunkEnd * fps),
-            direction: detectTextDirection(text),
-          });
+          pushChunk(
+            chunkWords.map((w) => w.text).join(' '),
+            chunkStart,
+            word.end - segStart,
+            undefined,
+          );
           chunkWords = [];
         }
       }
 
-      // Flush remaining words
       if (chunkWords.length > 0) {
-        const text = chunkWords.map((w) => w.text).join(' ');
-        const chunkEnd = chunkWords[chunkWords.length - 1]!.end - segStart;
-        track.push({
-          text,
-          startFrame: frameOffset + Math.round(chunkStart * fps),
-          endFrame: frameOffset + Math.round(chunkEnd * fps),
-          direction: detectTextDirection(text),
-        });
+        pushChunk(
+          chunkWords.map((w) => w.text).join(' '),
+          chunkStart,
+          chunkWords[chunkWords.length - 1]!.end - segStart,
+          undefined,
+        );
       }
     }
 
