@@ -306,7 +306,7 @@ export class JobOrchestrator {
 
       const results = await renderAllEnhancedScenes(specs, {
         outputDir: enhancementDir,
-        onProgress: (sceneId, percent) => {
+        onProgress: (sceneId: string, percent: number) => {
           progress('enhance', 'scene', `${sceneId}: ${percent}%`);
         },
       });
@@ -324,8 +324,8 @@ export class JobOrchestrator {
       );
       await saveJSON(job.id, 'edit', 'enhancement-manifest.json', manifest);
 
-      const successCount = results.filter((r) => r.success).length;
-      const fallbackCount = results.filter((r) => r.fallbackToStandard).length;
+      const successCount = results.filter((r: { success: boolean }) => r.success).length;
+      const fallbackCount = results.filter((r: { fallbackToStandard: boolean }) => r.fallbackToStandard).length;
       progress(
         'enhance',
         'done',
@@ -352,7 +352,7 @@ export class JobOrchestrator {
       if (canUseFastRender(timeline)) {
         progress('render', 'starting', 'Fast rendering with FFmpeg (lossless stream copy)');
         await renderWithFFmpeg(timeline, outputPath, {
-          onProgress: ({ percent }) => {
+          onProgress: ({ percent }: { percent: number }) => {
             progress('render', 'progress', `Rendering: ${percent}%`);
           },
         });
