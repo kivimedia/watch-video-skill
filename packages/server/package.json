@@ -16,6 +16,7 @@
     "@cutsense/agent": "workspace:*",
     "@cutsense/core": "workspace:*",
     "@cutsense/ingest": "workspace:*",
+    "@cutsense/providers": "workspace:*",
     "@cutsense/storage": "workspace:*"
   },
   "devDependencies": {

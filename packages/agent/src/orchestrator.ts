@@ -359,10 +359,10 @@ export class JobOrchestrator {
       } else {
         progress('render', 'starting', 'Rendering with Remotion');
         await render(timeline, outputPath, {
-          onProgress: ({ percent }) => {
+          onProgress: ({ percent }: { percent: number }) => {
             progress('render', 'progress', `Rendering: ${percent}%`);
           },
-          onBundleProgress: (p) => {
+          onBundleProgress: (p: number) => {
             progress('render', 'bundling', `Bundling compositions: ${(p * 100).toFixed(0)}%`);
           },
         });
