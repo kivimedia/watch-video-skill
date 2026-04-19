@@ -1,0 +1,25 @@
+{
+  "name": "@cutsense/server",
+  "version": "0.1.0",
+  "type": "module",
+  "author": "Ziv Raviv",
+  "license": "Apache-2.0",
+  "description": "Thin HTTP shim for TCE->CutSense VPS integration. Binds localhost:8300 only.",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --watch dist/index.js",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@cutsense/agent": "workspace:*",
+    "@cutsense/core": "workspace:*",
+    "@cutsense/ingest": "workspace:*",
+    "@cutsense/storage": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "*",
+    "typescript": "*"
+  }
+}

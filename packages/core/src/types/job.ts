@@ -46,6 +46,10 @@ export interface JobConfig {
   fps?: number;
   framesPerSecond?: number;
   maxBudgetUSD?: number;
+  /** Cut any silence gap >= this many milliseconds. Undefined = no silence cutting. */
+  silenceCutMinMs?: number;
+  /** Take-picker mode: 'vision_audio' scores by Whisper confidence + VUD visual quality. 'none' skips take-picking. */
+  takePicker?: 'vision_audio' | 'none';
 }
 
 export interface Job {

@@ -239,6 +239,8 @@ export class JobOrchestrator {
       const timeline = await edit(vud, this.options.userInstruction!, this.trackedProvider.withStage('edit'), {
         targetDuration: this.options.targetDuration,
         captionStyle: this.options.captionStyle,
+        silenceThresholdSec: job.config.silenceCutMinMs ? job.config.silenceCutMinMs / 1000 : undefined,
+        takePicker: job.config.takePicker ?? 'none',
         onProgress: (step, detail) => progress('edit', step, detail),
       });
 
