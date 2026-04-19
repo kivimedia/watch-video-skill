@@ -55,18 +55,16 @@ export async function edit(
     progress('pacing-warning', pacingWarnings.join('; '));
   }
 
-  const silenceThreshold = options.silenceThresholdSec ?? 0;
-
-  // 4. Plan captions (from actual spoken audio - silence gaps are excised from frame offsets)
+  // 4. Plan captions (from actual spoken audio)
   let captions;
   if (edl.captionMode !== 'none') {
     progress('captions', `Building ${edl.captionMode} captions from spoken audio`);
-    captions = planCaptions(vud, edl, vud.metadata.fps || 30, silenceThreshold);
+    captions = planCaptions(vud, edl, vud.metadata.fps || 30);
   }
 
-  // 5. Build timeline (silence islands kept in sync with caption frame offsets)
+  // 5. Build timeline
   progress('timeline', 'Assembling Remotion timeline');
-  const timeline = buildTimeline(vud, edl, captions, silenceThreshold);
+  const timeline = buildTimeline(vud, edl, captions);
 
   // 6. Validate
   progress('validate', 'Validating timeline');
