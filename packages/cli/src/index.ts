@@ -6,6 +6,7 @@ import { understandCommand } from './commands/understand.js';
 import { editCommand } from './commands/edit.js';
 import { renderCommand } from './commands/render.js';
 import { cleanCommand } from './commands/clean.js';
+import { correctTranscriptCommand } from './commands/correct-transcript.js';
 
 const program = new Command()
   .name('cutsense')
@@ -15,6 +16,7 @@ const program = new Command()
 program.addCommand(runCommand);
 program.addCommand(ingestCommand);
 program.addCommand(understandCommand);
+program.addCommand(correctTranscriptCommand);
 program.addCommand(editCommand);
 program.addCommand(renderCommand);
 program.addCommand(statusCommand);

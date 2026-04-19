@@ -175,7 +175,7 @@ async function handleEdit(
     provider,
     userInstruction: body.prompt,
     captionStyle: body.captions ?? 'jumbo',
-    onProgress: (stage, step, detail) => {
+    onProgress: (stage: string, step: string, detail?: string) => {
       console.log(`[/edit][${job.id}] [${stage}] ${step}${detail ? ': ' + detail : ''}`);
     },
   });

@@ -47,20 +47,21 @@ export async function planCuts(
     [
       {
         role: 'system',
-        content: `You are a professional video editor creating polished demo/highlight videos. Given segments from a video and user instructions, decide which segments to keep, trim, or remove.
+        content: `You are a professional video editor creating polished walking-monologue videos. Given segments from a video and user instructions, decide which segments to keep, trim, or remove.
 
 CRITICAL RULES:
 1. Respect the user's instruction precisely - this is the highest priority.
-2. PRESERVE NARRATIVE FLOW: For demo/tutorial videos, every question or prompt from the user MUST be followed by the system's response. Never show an answer without the question that triggered it. Never show a question without its answer.
-3. The "screen_text" field shows what text is visible on screen (UI text, chat messages, bot responses). For screen recordings, this is often MORE important than the audio transcript. Use it to understand what the user typed/asked and what the system responded.
-4. TRIM VALUES: If you use trimStart/trimEnd, they MUST be within the segment's time range. trimStart >= segment start time. trimEnd <= segment end time. If you don't need to trim, use null for both.
-5. AGGRESSIVELY remove dead air: silent gaps, breath pauses longer than ~0.4s, loading screens, browser navigation that isn't part of the demo, idle scrolling. This is the difference between a tight cut and a flabby one.
-6. MICRO-TRIM WITHIN KEPT SEGMENTS using trimStart/trimEnd. A segment doesn't have to be kept whole - shave the leading/trailing silence, the filler words ("um", "uh", "like", "you know", "so"), the restart after a stumble, and the tail after the sentence lands. For a 10s segment where the speaker pauses for 1.5s at the start, trimStart = seg.startTime + 1.5.
-7. Keep segments where the user asks a question (via voice or text visible on screen) AND the segments where the system responds.
-8. Prefer high-energy, visually interesting segments.
-9. TARGET DURATION IS A HARD CAP. If a target duration is given, the SUM of kept segment durations (after any trimStart/trimEnd) MUST be <= target. Under-budget is fine; over-budget is a failure. Before emitting JSON, mentally sum the kept durations and verify. If over, drop the lowest-value segments or trim harder - do not stretch the budget.
-10. Avoid cutting mid-word or mid-sentence (use word-level timing in the transcript to choose trim points on sentence boundaries).
-11. For screen recordings: keep the full question-answer cycle even if individual segments are low energy.
+2. SENTENCE INTEGRITY IS NON-NEGOTIABLE. Never remove a segment that contains the middle of a sentence while keeping the segments on either side of it. Every kept segment must either (a) contain a complete sentence, or (b) connect cleanly to the adjacent kept segment with no missing words in between. If you keep segment A ending mid-sentence and segment B starting with the next sentence, that is a bad cut. Read the audio transcripts of adjacent kept segments aloud in your head - they must flow as natural speech.
+3. TRIM ONLY AT SENTENCE BOUNDARIES. When using trimStart/trimEnd, only trim to a point where a complete sentence ends (period, question mark, exclamation mark in the transcript). Never trim to a comma, mid-phrase, or mid-sentence. If you cannot find a clean sentence boundary to trim to, keep the whole segment or remove it entirely.
+4. PRESERVE NARRATIVE FLOW: every story beat must be complete. If you keep the setup, keep the payoff. If you keep a claim, keep the evidence or example that follows it.
+5. The "screen_text" field shows what text is visible on screen (UI text, chat messages, bot responses). For screen recordings, this is often MORE important than the audio transcript.
+6. TRIM VALUES: If you use trimStart/trimEnd, they MUST be within the segment's time range. trimStart >= segment start time. trimEnd <= segment end time. If you don't need to trim, use null for both.
+7. Remove dead air between kept segments - but the post-processing pipeline handles silence removal automatically. Your job is to choose WHICH complete sentences and story beats to keep, not to micro-trim within sentences.
+8. MICRO-TRIM at sentence edges only: shave leading silence before the first sentence starts, and trailing silence after the last sentence ends. Use trimStart = seg.startTime + (silence before first word) and trimEnd = seg.endTime - (silence after last word). Do NOT trim into sentence content.
+9. Prefer high-energy, complete thought segments.
+10. TARGET DURATION IS A HARD CAP. The SUM of kept segment durations (after any trimStart/trimEnd) MUST be <= target. Under-budget is fine; over-budget is a failure. Drop whole story beats (complete sentences) to meet the budget - never achieve budget by cutting inside a sentence.
+11. Before finalizing: read the transcript of your kept segments in order. If any transition between adjacent segments sounds like a missing word or broken thought, fix it by either keeping the bridging segment or cutting both sides of the break.
+12. THE ENDING MUST BE A PAYOFF, NOT A SETUP. The last kept segment must end on a strong, conclusive statement - a claim, a insight, a call to action, or a punchy closer. NEVER end on a sentence that introduces something ("let me give you an example", "here's what I mean", "as I wrap up", "one more thing", "speaking of which", "for instance") - those are bridges to content that was cut and they leave the viewer hanging. If the last segment ends on a bridge phrase, trim it off or choose an earlier segment that ends stronger.
 
 Return ONLY valid JSON (no markdown, no prose):
 {
@@ -158,29 +159,60 @@ ${segmentData}`,
       actualDuration > targetDurationSec * OVER_BUDGET_TOLERANCE
     ) {
       const overageSec = actualDuration - targetDurationSec;
+      const minSegments = Math.max(3, Math.floor(vud.segments.length * 0.3));
+
+      // Build segment data from ONLY the first-pass kept segments so the model
+      // tightens the existing selection rather than re-planning from scratch.
+      // Sending the full segment list caused the model to drop everything.
+      const keptSegmentData = decisions
+        .filter((d) => d.action !== 'remove')
+        .map((d) => {
+          const seg = vud.segments.find((s) => s.id === d.segmentId);
+          if (!seg) return null;
+          const effectiveStart = d.trimStart ?? seg.startTime;
+          const effectiveEnd = d.trimEnd ?? seg.endTime;
+          const parts = [
+            `${seg.id}: ${effectiveStart.toFixed(1)}s-${effectiveEnd.toFixed(1)}s (${(effectiveEnd - effectiveStart).toFixed(1)}s) [first-pass: ${d.action}]`,
+            `energy=${seg.energy.toFixed(2)}`,
+          ];
+          if (seg.transcript) parts.push(`audio="${seg.transcript.slice(0, 120)}"`);
+          if (seg.textOnScreen) parts.push(`screen_text="${seg.textOnScreen.slice(0, 200)}"`);
+          if (seg.visualDescription) parts.push(`visual="${seg.visualDescription.slice(0, 150)}"`);
+          if (seg.sceneType) parts.push(`type=${seg.sceneType}`);
+          if (seg.visualInterest) parts.push(`interest=${seg.visualInterest}`);
+          if (seg.isSilent) parts.push('SILENT');
+          return parts.join(' | ');
+        })
+        .filter(Boolean)
+        .join('\n');
+
       const tightenResponse = await provider.chat(
         [
           {
             role: 'system',
-            content: `You are re-planning the edit. The previous plan was over budget and will be rejected. Apply the same rules as before, but tighten the result.`,
+            content: `You are re-planning the edit. The previous plan was over budget and will be rejected. Apply the same rules as before:
+- SENTENCE INTEGRITY IS NON-NEGOTIABLE. Never cut mid-sentence. Only trim at sentence boundaries (. ! ?).
+- PRESERVE NARRATIVE FLOW. If you keep a setup, keep its payoff.
+- THE ENDING MUST BE A PAYOFF. Never end on a bridge phrase.
+- You MUST keep at least ${minSegments} segments. Removing all segments or collapsing to 1-2 clips is never acceptable.`,
           },
           {
             role: 'user',
-            content: `Previous plan kept ${actualDuration.toFixed(1)}s against a hard target of ${targetDurationSec}s. That's ${overageSec.toFixed(1)}s over. Tighten it by ~${overageSec.toFixed(1)}s: drop ONE weak middle segment, or shave trimStart/trimEnd on kept segments (breath pauses, filler, tails).
+            content: `The first pass kept ${actualDuration.toFixed(1)}s against a hard target of ${targetDurationSec}s. That's ${overageSec.toFixed(1)}s over budget. Tighten it by ~${overageSec.toFixed(1)}s: drop ONE weak middle segment from the kept list, or shave trimStart/trimEnd on existing kept segments (breath pauses, filler, tails).
 
-HARD CONSTRAINTS on the new plan:
+HARD CONSTRAINTS:
 - Total kept duration MUST be <= ${targetDurationSec}s (hard cap)
 - Total kept duration MUST be >= ${Math.round(targetDurationSec * 0.75)}s (don't strip the video to nothing)
-- Keep the hook (first meaningful segment) and the payoff (final takeaway)
-- Keep at least ${Math.max(3, Math.floor(vud.segments.length * 0.3))} segments - don't collapse the arc
+- Keep the hook (first kept segment) and the payoff (final kept segment)
+- You MUST return at least ${minSegments} segments with action "keep" or "trim" - returning fewer is a failure
+- Only segments listed below exist in the first-pass plan. Do NOT introduce segment IDs not in this list.
 
 Original instruction: "${instruction}"
-Total video duration: ${vud.duration.toFixed(1)} seconds
 
-Segments:
-${segmentData}
+FIRST-PASS KEPT SEGMENTS (work only from this list):
+${keptSegmentData}
 
-Return ONLY valid JSON in the same shape as before.`,
+Return ONLY valid JSON in the same shape as before. Include ALL kept segments in your response (even unchanged ones).`,
           },
         ],
         { jsonMode: true, maxTokens: 16384 },

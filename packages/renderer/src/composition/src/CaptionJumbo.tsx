@@ -7,7 +7,12 @@ interface Props {
 }
 
 export const CaptionJumbo: React.FC<Props> = ({ config }) => {
-  const { track, direction } = config;
+  const { track, direction, position } = config;
+  // Default to 'bottom' (lower third) rather than 'center' - centered
+  // word-by-word captions consistently occlude the speaker's face in
+  // 9:16 talking-head recordings. Callers can override with 'top' or
+  // 'center' explicitly if the framing is unusual.
+  const effectivePosition = position ?? 'bottom';
 
   return (
     <>
@@ -22,6 +27,7 @@ export const CaptionJumbo: React.FC<Props> = ({ config }) => {
             text={chunk.text}
             direction={chunk.direction ?? direction}
             highlight={chunk.highlight}
+            position={effectivePosition}
           />
         </Sequence>
       ))}
@@ -33,9 +39,10 @@ interface JumboWordProps {
   text: string;
   direction: 'ltr' | 'rtl';
   highlight?: boolean;
+  position: 'top' | 'center' | 'bottom';
 }
 
-const JumboWord: React.FC<JumboWordProps> = ({ text, direction, highlight }) => {
+const JumboWord: React.FC<JumboWordProps> = ({ text, direction, highlight, position }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -53,11 +60,22 @@ const JumboWord: React.FC<JumboWordProps> = ({ text, direction, highlight }) => 
     config: { mass: 0.3, stiffness: 300, damping: 20 },
   });
 
+  // AbsoluteFill is a column flex container, so justifyContent controls
+  // the vertical axis. alignItems: 'center' keeps words horizontally centered.
+  const justifyContent =
+    position === 'top' ? 'flex-start' :
+    position === 'bottom' ? 'flex-end' :
+    'center';
+  const paddingTop = position === 'top' ? '15%' : 0;
+  const paddingBottom = position === 'bottom' ? '15%' : 0;
+
   return (
     <AbsoluteFill
       style={{
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent,
+        paddingTop,
+        paddingBottom,
       }}
     >
       <div

@@ -268,6 +268,31 @@ importers:
         specifier: '*'
         version: 3.2.4(@types/node@22.19.17)(terser@5.46.1)(tsx@4.21.0)
 
+  packages/server:
+    dependencies:
+      '@cutsense/agent':
+        specifier: workspace:*
+        version: link:../agent
+      '@cutsense/core':
+        specifier: workspace:*
+        version: link:../core
+      '@cutsense/ingest':
+        specifier: workspace:*
+        version: link:../ingest
+      '@cutsense/providers':
+        specifier: workspace:*
+        version: link:../providers
+      '@cutsense/storage':
+        specifier: workspace:*
+        version: link:../storage
+    devDependencies:
+      '@types/node':
+        specifier: '*'
+        version: 22.19.17
+      typescript:
+        specifier: '*'
+        version: 5.9.3
+
   packages/storage:
     dependencies:
       '@cutsense/core':

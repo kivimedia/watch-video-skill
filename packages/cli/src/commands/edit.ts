@@ -13,6 +13,7 @@ export const editCommand = new Command('edit')
   .option('--provider <name>', 'AI provider', 'anthropic')
   .option('--duration <seconds>', 'Target output duration', parseFloat)
   .option('--captions <style>', 'Caption style: none|standard|jumbo', 'standard')
+  .option('--silence <seconds>', 'Remove silence gaps >= N seconds (e.g. --silence 1.0)', parseFloat)
   .action(async (jobId: string, opts) => {
     const progress = new ProgressReporter(4);
 
@@ -25,6 +26,7 @@ export const editCommand = new Command('edit')
       const timeline = await runEdit(vud, opts.prompt, provider, {
         targetDuration: opts.duration,
         captionStyle: opts.captions,
+        silenceThresholdSec: opts.silence,
         onProgress: (step, detail) => progress.info(`[edit] ${step}: ${detail ?? ''}`),
       });
 

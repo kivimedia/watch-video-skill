@@ -24,6 +24,17 @@ export async function edit(
 ): Promise<CutSenseTimeline> {
   const progress = options.onProgress ?? (() => {});
 
+  // 0. Transcript QA - flag low-confidence words before any edit decisions
+  const LOW_CONF_THRESHOLD = 0.7;
+  const lowConfWords = vud.segments.flatMap((seg) =>
+    seg.words
+      .filter((w) => w.confidence !== undefined && w.confidence < LOW_CONF_THRESHOLD)
+      .map((w) => `"${w.text.trim()}" @${w.start.toFixed(1)}s (conf ${(w.confidence! * 100).toFixed(0)}%)`),
+  );
+  if (lowConfWords.length > 0) {
+    progress('transcript-qa', `${lowConfWords.length} low-confidence word(s) - verify: ${lowConfWords.slice(0, 10).join(', ')}${lowConfWords.length > 10 ? ` (+${lowConfWords.length - 10} more)` : ''}`);
+  }
+
   // 1. Plan cuts
   progress('planning', 'Generating edit decision list');
   let edl = await planCuts(vud, instruction, provider, options.targetDuration);
@@ -55,16 +66,18 @@ export async function edit(
     progress('pacing-warning', pacingWarnings.join('; '));
   }
 
-  // 4. Plan captions (from actual spoken audio)
+  const silenceThreshold = options.silenceThresholdSec ?? 0;
+
+  // 4. Plan captions (from actual spoken audio - silence gaps are excised from frame offsets)
   let captions;
   if (edl.captionMode !== 'none') {
     progress('captions', `Building ${edl.captionMode} captions from spoken audio`);
-    captions = planCaptions(vud, edl, vud.metadata.fps || 30);
+    captions = planCaptions(vud, edl, vud.metadata.fps || 30, silenceThreshold);
   }
 
-  // 5. Build timeline
+  // 5. Build timeline (silence islands kept in sync with caption frame offsets)
   progress('timeline', 'Assembling Remotion timeline');
-  const timeline = buildTimeline(vud, edl, captions);
+  const timeline = buildTimeline(vud, edl, captions, silenceThreshold);
 
   // 6. Validate
   progress('validate', 'Validating timeline');

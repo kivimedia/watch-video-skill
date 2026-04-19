@@ -18,12 +18,14 @@ export const runCommand = new Command('run')
   .option('--language <lang>', 'Force language (default: auto)')
   .option('--enhance', 'Enable hybrid rendering with Revideo scene enhancements', false)
   .option('--max-enhanced <n>', 'Max segments to enhance', parseInt)
+  .option('--silence <seconds>', 'Remove silence gaps >= N seconds (e.g. --silence 1.0)', parseFloat)
   .option('--output <path>', 'Output file path')
   .action(async (videoPath: string, opts) => {
     const progress = new ProgressReporter(opts.enhance ? 10 : 8);
 
     try {
       progress.step('Creating job', videoPath);
+      const silenceCutMinMs = opts.silence ? Math.round(opts.silence * 1000) : undefined;
       const job = await createJob(videoPath, {
         provider: opts.provider,
         model: opts.model,
@@ -32,6 +34,7 @@ export const runCommand = new Command('run')
         captionStyle: opts.captions,
         language: opts.language,
         userInstruction: opts.prompt,
+        silenceCutMinMs,
       });
 
       console.log(chalk.dim(`Job ID: ${job.id}`));
