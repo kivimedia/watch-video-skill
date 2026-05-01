@@ -40,6 +40,24 @@ export async function understand(
   const energyCurve = buildEnergyCurve(segments, ingestResult.metadata.lufs);
   assignSegmentEnergy(segments, energyCurve);
 
+  // Snapshot raw duplicate-frame ratio BEFORE applyAdaptiveSampling mutates
+  // the isDuplicate flags. This is the motion-quality signal: how many frames
+  // are perceptual duplicates of their predecessor as the ingest layer
+  // originally measured them via phash.
+  //
+  // Without this snapshot, the dup-ratio reading is misleading because Phase
+  // 2 of adaptive sampling (visual-change reflag) clears isDuplicate on
+  // frames it wants to keep for visual analysis - typically masking 50%+ of
+  // the original duplicates.
+  //
+  // Threshold 40% chosen empirically: SalesEcho live-shot reels score
+  // ~10-15%, Hedra talking-head clips ~5-15%, but Ken-Burns-only static
+  // reels score >50%. 40% is the floor where "slideshow feel" becomes
+  // obvious to a human viewer.
+  const rawTotalFrames = ingestResult.frames.length;
+  const rawDupCount = ingestResult.frames.filter((f) => f.isDuplicate).length;
+  const rawDupRatio = rawTotalFrames > 0 ? rawDupCount / rawTotalFrames : 0;
+
   // 2.5. Adaptive frame sampling - refine which frames are available for visual analysis
   progress('adaptive-sampling', 'Refining frame selection based on speech and visual changes');
   const samplingStats = applyAdaptiveSampling(ingestResult.frames, ingestResult.transcript);
@@ -74,6 +92,14 @@ export async function understand(
     energyCurve,
     provider,
   );
+
+  // 4.5. Surface motion-quality warning when raw duplicate-frame ratio is
+  // high enough that the video reads as a slideshow. Prepend to the LLM-
+  // produced summary so anyone reading the VUD sees this top-line.
+  if (rawDupRatio >= 0.40 && rawTotalFrames > 0) {
+    const pct = Math.round(rawDupRatio * 100);
+    vud.summary = `[motion-quality: ${pct}% of frames are perceptual duplicates of the prior frame - subjects show minimal movement; this video may read as a slideshow rather than live footage] ${vud.summary}`;
+  }
 
   // 5. Validate
   progress('validate', 'Validating VUD');

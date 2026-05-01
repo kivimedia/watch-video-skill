@@ -116,6 +116,10 @@ Generate: summary, keyMoments, and any segmentUpdates for visual fields you want
     // Use defaults if LLM output parsing fails
   }
 
+  // motion-quality warning (slideshow detection) is now applied in
+  // orchestrator.ts BEFORE applyAdaptiveSampling mutates the isDuplicate
+  // flags. See orchestrator.ts for the dup-ratio logic.
+
   const vud: VUD = {
     version: '1.0',
     jobId: ingestResult.jobId,
