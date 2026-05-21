@@ -9,6 +9,26 @@ export { BaseProvider, readImageAsBase64, getMediaType, encodeImageToBase64 } fr
 export { AnthropicProvider } from './anthropic/provider.js';
 export { OpenAIProvider } from './openai/provider.js';
 export { GeminiProvider } from './gemini/provider.js';
+export {
+  GeminiVideoProcessor,
+  classifyVideoRoute,
+  VIDEO_INLINE_LIMIT_BYTES,
+  VIDEO_UPLOAD_LIMIT_BYTES,
+  type VideoSource,
+  type AnalyzeOptions as GeminiVideoAnalyzeOptions,
+  type StructuredAnalyzeOptions as GeminiVideoStructuredAnalyzeOptions,
+  type GeminiVideoModel,
+  type TimestampedEvent,
+  type SceneSummaryEntry,
+  type ScreenTextEntry,
+} from './gemini/video.js';
+export {
+  preprocessVideo,
+  buildPreprocessArgs,
+  type PreprocessOptions,
+  type PreprocessResult,
+  type PreprocessHeight,
+} from './gemini/preprocess.js';
 export { TrackedProvider } from './tracked-provider.js';
 
 export function createProvider(

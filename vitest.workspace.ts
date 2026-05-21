@@ -5,4 +5,5 @@ export default defineWorkspace([
   'packages/storage',
   'packages/edit',
   'packages/understand',
+  'packages/providers',
 ]);
