@@ -113,7 +113,7 @@ output.mp4
 **Bug 7 - Anthropic `premium` and `standard` model tiers are identical**
 - **File:** `packages/core/src/types/providers.ts`
 - **Issue:** Both `premium` and `standard` tiers for Anthropic map to `claude-sonnet-4-20250514`. The model router cannot distinguish between them.
-- **Fix:** Map `premium` to Opus (`claude-opus-4-20250514`) and `standard` to Sonnet.
+- **Fix:** Map `premium` to Opus (`claude-opus-4-8`) and `standard` to Sonnet.
 
 ---
 
