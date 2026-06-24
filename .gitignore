@@ -27,3 +27,6 @@ plans/
 .venv-ready
 .next/
 next-env.d.ts
+
+# local video inputs / job scratch
+inputs/
