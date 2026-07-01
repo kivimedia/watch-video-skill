@@ -86,7 +86,7 @@ export const DEFAULT_MODELS: Record<ProviderName, Record<ModelTier, ModelConfig>
     },
     standard: {
       provider: 'anthropic',
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-5',
       tier: 'standard',
       inputCostPer1kTokens: 0.003,
       outputCostPer1kTokens: 0.015,
