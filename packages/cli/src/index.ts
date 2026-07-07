@@ -1,3 +1,4 @@
+import './load-env.js'; // must be first: populates process.env from .env before providers read it
 import { Command } from 'commander';
 import { runCommand } from './commands/run.js';
 import { statusCommand } from './commands/status.js';
