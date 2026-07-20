@@ -6,10 +6,15 @@
 import { spawn } from 'child_process';
 import { PythonSidecarManager } from './manager.js';
 
-const DEFAULT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const FALLBACK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+// Long videos (multi-hour masterclasses) need more than 10 minutes per
+// sidecar script; CUTSENSE_SCRIPT_TIMEOUT_MS overrides without a code change.
+const envTimeout = Number(process.env.CUTSENSE_SCRIPT_TIMEOUT_MS);
+const DEFAULT_TIMEOUT_MS =
+  Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : FALLBACK_TIMEOUT_MS;
 
 export interface RunnerOptions {
-  /** Timeout in milliseconds. Defaults to 10 minutes. */
+  /** Timeout in milliseconds. Defaults to CUTSENSE_SCRIPT_TIMEOUT_MS or 10 minutes. */
   timeoutMs?: number;
 }
 
