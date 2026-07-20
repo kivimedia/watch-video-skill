@@ -14,7 +14,6 @@ import { BaseProvider } from '../base.js';
 
 const PRICING: Record<string, { input: number; output: number }> = {
   'claude-sonnet-5': { input: 0.003, output: 0.015 },
-  'claude-sonnet-5': { input: 0.003, output: 0.015 },
   'claude-opus-4-20250514': { input: 0.015, output: 0.075 },
   'claude-opus-4-8': { input: 0.015, output: 0.075 },
   'claude-haiku-4-5-20251001': { input: 0.0008, output: 0.004 },
