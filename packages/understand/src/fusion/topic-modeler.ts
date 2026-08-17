@@ -1,4 +1,5 @@
 import type { Topic, VUDSegment, AIProvider } from '@cutsense/core';
+import { salvageJson } from '../llm/json-salvage.js';
 
 export async function extractTopics(
   segments: VUDSegment[],
@@ -20,23 +21,43 @@ Use descriptive, searchable labels like "Product Demo", "Customer Testimonial", 
       },
       { role: 'user', content: segmentSummaries },
     ],
-    { jsonMode: true, maxTokens: 2048 },
+    // The topic list is short, but the segment listing fed in is not, and the old 2048 cap
+    // could be spent before the closing brace. Failing that parse returned [], which is
+    // indistinguishable from a video with no discernible topics.
+    { jsonMode: true, maxTokens: 8192 },
   );
 
-  try {
-    const parsed = JSON.parse(response.content);
-    const raw = parsed.topics ?? [];
+  const { value: parsed, truncated } = salvageJson<{ topics?: unknown }>(response.content);
 
-    return raw.map((t: { id: string; label: string; segments: string[] }) => ({
-      id: t.id,
-      label: t.label,
-      segments: t.segments,
-      totalDuration: t.segments.reduce((sum: number, segId: string) => {
-        const seg = segments.find((s) => s.id === segId);
-        return sum + (seg ? seg.duration : 0);
-      }, 0),
-    }));
-  } catch {
+  if (parsed === null) {
+    console.warn(
+      `[topic-modeler] response did not parse (${response.content.length} chars). ` +
+        `Returning no topics, which is a failure and not a topicless video.`,
+    );
     return [];
   }
+  if (truncated) {
+    console.warn('[topic-modeler] response was truncated; recovered the complete topics only.');
+  }
+
+  const raw = (Array.isArray(parsed) ? parsed : (parsed.topics ?? [])) as Array<{
+    id?: string;
+    label?: string;
+    segments?: string[];
+  }>;
+
+  return raw
+    .filter((t) => t && typeof t.label === 'string' && t.label.length > 0)
+    .map((t) => {
+      const segIds = Array.isArray(t.segments) ? t.segments : [];
+      return {
+        id: t.id ?? `topic_${t.label!.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        label: t.label!,
+        segments: segIds,
+        totalDuration: segIds.reduce((sum: number, segId: string) => {
+          const seg = segments.find((s) => s.id === segId);
+          return sum + (seg ? seg.duration : 0);
+        }, 0),
+      };
+    });
 }
